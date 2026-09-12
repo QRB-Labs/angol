@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data/qdrant_storage:/qdrant/storage
+    # Configured for mmap and int8 inside the app
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: enterprise_sheets
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/pg_storage:/var/lib/postgresql/data
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    ports:
+      - "3000:8080" # Exposed on port 3000
+    environment:
+      # Points to the custom FastAPI middleware running on the host machine
+      - OPENAI_API_BASE_URL=http://172.17.0.1:8081/v1
+      - OPENAI_API_KEY=local-key
+    volumes:
+      - ./data/webui_storage:/app/backend/data
