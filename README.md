@@ -12,6 +12,24 @@ Runs locally on a NDVIDIA GDX Spark or less.
 
 # High-Level Design: Enterprise AI 
 
+- [Objective](#objective)
+- [Overview](#overview)
+- [Detailed Design](#detailed-design)
+  - [1. Ingestion & Parsing Layer](#1-ingestion--parsing-layer)
+  - [2. Chunking & Embedding Layer](#2-chunking--embedding-layer)
+  - [3. Clustering & Summarization (RAPTOR Pipeline)](#3-clustering--summarization-raptor-pipeline)
+  - [4. Storage Layer](#4-storage-layer)
+  - [5. Retrieval & Generation Layer](#5-retrieval--generation-layer)
+    - [Step 1: Query Vectorization (The translation)](#step-1-query-vectorization-the-translation)
+    - [Step 2: The RAPTOR Database Search (Fetching Context)](#step-2-the-raptor-database-search-fetching-context)
+    - [Step 3: Context Assembly (The Handoff to Reasoning / Generation LLM)](#step-3-context-assembly-the-handoff-to-reasoning--generation-llm)
+    - [Step 4: Generation and Citation](#step-4-generation-and-citation)
+  - [6. User Interface](#6-user-interface)
+- [Quantitative Estimates](#quantitative-estimates)
+- [Hardware](#hardware)
+- [Design Alternatives](#design-alternatives)
+- [Notes](#notes)
+
 ## Objective
 To build a highly secure, locally deployed (air-gapped) Enterprise AI system capable of ingesting large volumes of heterogeneous corporate documents (PDFs, PPTs, Spreadsheets). The system will provide accurate, reasoned answers to both granular and global queries, synthesize knowledge across multiple documents, and explicitly cite supporting sources. 
 
