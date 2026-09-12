@@ -10,7 +10,7 @@ Corpus: Up to 1TB of documents
 Runs locally on a NDVIDIA GDX Spark or less.
 -->
 
-# High-Level Design: Enterprise AI Knowledge Brain
+# High-Level Design: Enterprise AI 
 
 ## Objective
 To build a highly secure, locally deployed (air-gapped) Enterprise AI system capable of ingesting large volumes of heterogeneous corporate documents (PDFs, PPTs, Spreadsheets). The system will provide accurate, reasoned answers to both granular and global queries, synthesize knowledge across multiple documents, and explicitly cite supporting sources. 
@@ -33,8 +33,8 @@ The system utilizes an advanced Retrieval-Augmented Generation (RAG) architectur
 ### 3. Clustering & Summarization (RAPTOR Pipeline)
 To enable holistic reasoning across the corpus, data is grouped and summarized hierarchically:
 *   **Metadata Partitioning:** Vectors are first bucketed by metadata (e.g., Department, Year) into batches of 20,000 to 40,000 chunks to prevent memory overflow.
-*   **GPU Clustering:** [NVIDIA FAISS](https://github.com/facebookresearch/faiss) runs GPU-accelerated K-Means clustering on the buckets to group related chunks across different documents.
-*   **Summarization:** An LLM reads the text of each cluster and generates a summary. The summary is embedded, storing the source document citations as metadata.
+*   **GPU Clustering:** [NVIDIA FAISS](https://github.com/facebookresearch/faiss) runs GPU-accelerated K-Means clustering on the buckets to group related chunks across different documents (with K=200 to 400 clusters per batch, maintaining a 100:1 compression ratio).
+*   **Summarization:** A dedicated Summarization LLM (highly recommended: **Meta Llama-3.1-8B-Instruct** deployed via **vLLM** for maximum batch-processing throughput on English corpora) reads the concatenated text of each cluster and generates a comprehensive summary. This new summary text is then embedded and pushed back into the vector database, explicitly storing the source document citations of all underlying child nodes as metadata to preserve accurate lineage and attribution.
 *   **Recursion:** Summaries are clustered and summarized iteratively until a "Root Node" executive summary is reached.
 
 ### 4. Storage Layer
@@ -44,7 +44,55 @@ To enable holistic reasoning across the corpus, data is grouped and summarized h
 ### 5. Retrieval & Generation Layer
 *   **Model Serving:** [vLLM](https://github.com/vllm-project/vllm) for high-throughput, memory-efficient LLM serving.
 *   **Reasoning Engine:** [Qwen-2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) or [Meta Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct). Selected for high reasoning capabilities within constrained VRAM.
-*   **Routing Agent:** User queries are routed either to the Vector Database (for text questions) or to a Text-to-SQL Agent (for massive spreadsheet computation).
+ *   **Routing Agent:** Managed by LlamaIndex (e.g., via a `RouterQueryEngine`). Rather than requiring a separate model, the orchestrator dynamically prompts the primary Reasoning Engine (e.g., Qwen-2.5-32B) to act as a decision-maker. Before executing a search, the LLM is prompted to classify the user's intent, dynamically routing the query to either the Vector Database (for text/conceptual questions) or to a Text-to-SQL Agent (for massive spreadsheet math and structured data).
+
+**LlamaIndex** acts as the Orchestrator. It acts as the bridge between the user, the Vector DB (Qdrant), and the LLM via a 4-step programmatic workflow:
+
+#### Step 1: Query Vectorization (The translation)
+When a user submits a prompt (e.g., *"Summarize the supply chain risks in Europe for 2023"*):
+1. **Routing:** The Orchestrator determines this is a text-based query, not a math/spreadsheet query.
+2. **Embedding:** The Orchestrator sends the user's raw text prompt to the **BGE-M3** embedding model. 
+3. BGE-M3 translates the user's English prompt into a single 1024-dimensional query vector.
+
+#### Step 2: The RAPTOR Database Search (Fetching Context)
+The Orchestrator sends this single query vector to **Qdrant**. 
+1. **Hybrid Search:** Qdrant performs a hybrid search against the 40 Million vectors in RAM. It looks for both mathematical proximity (HNSW Vector Search) and exact keyword matches (Sparse/BM25 Search).
+2. **Tree Collapse Search:** Because of the RAPTOR architecture, Qdrant searches the *entire* hierarchy simultaneously, from **Level 0 Leaf Nodes** (raw document chunks) to **Level 1, 2 or 3 Summary Nodes** (synthesized overviews).
+3. Qdrant returns the Top 20 results to the Orchestrator. These results are returned as JSON objects containing the **Original Text Payload** and the **Metadata Array** (citations, page numbers, source docs).
+
+#### Step 3: Context Assembly (The Handoff to Reasoning / Generation LLM)
+
+The Orchestrator takes the Top 20 text payloads retrieved from Qdrant and injects them into a strict **System Prompt Template**  in the Reasomning LLM (Qwen)'s context window.
+
+The payload sent to Qwen via **vLLM** looks exactly like this:
+
+```text
+<|im_start|>system
+You are an expert enterprise AI assistant. You must answer the user's question using ONLY the provided context below. If the context does not contain the answer, say "I do not know." 
+
+For every claim you make, you MUST append an inline citation using the exact [Doc_ID, Page] provided in the context.
+
+--- CONTEXT ---
+[Doc_ID: Report_2023.pdf, Page: 42, Source_Level: 0]
+Text: "European supply chain risks increased by 14% due to delayed customs processing..."
+
+[Doc_ID: Multi-Doc Summary Node, Sources: (Logistics_Q1.pdf, Logistics_Q2.pdf), Source_Level: 2]
+Text: "Over the course of 2023, automated warehouse rollouts offset regional freight delays..."
+--- END CONTEXT ---
+<|im_end|>
+<|im_start|>user
+Summarize the supply chain risks in Europe for 2023.
+<|im_end|>
+<|im_start|>assistant
+```
+
+#### Step 4: Generation and Citation
+1. **Inference:** **Qwen-2.5-32B** reads the fully assembled prompt. Because it is an Instruction-Tuned model (`-Instruct`), it strictly obeys the system prompt.
+2. **Synthesis:** It evaluates the competing facts in the provided context (understanding that Level 2 nodes are high-level summaries and Level 0 nodes are granular facts).
+3. **Output:** It streams the final text back to the User Interface, explicitly injecting the citations provided by Qdrant's metadata (e.g., *"Supply chain risks increased by 14% [Report_2023.pdf, Page 42], however, automation offset these delays [Multi-Doc Summary Node]."*). 
+
+**Summary of the Interaction:** The Vector Database acts purely as an ultra-fast semantic filter. The LLM acts purely as a reasoning and reading engine. The Orchestrator (LlamaIndex) facilitates the handoff by wrapping the database's text results into a prompt that the LLM can read.
+
 
 ### 6. User Interface
 *   **Frontend:** [Open WebUI](https://github.com/open-webui/open-webui). Provides a ChatGPT-like interface with built-in citation rendering and document snippet viewing.
