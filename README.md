@@ -34,7 +34,7 @@ Runs locally on a NDVIDIA GDX Spark or less.
 To build a highly secure, locally deployed (air-gapped) Enterprise AI system capable of ingesting large volumes of heterogeneous corporate documents (PDFs, PPTs, Spreadsheets). The system will provide accurate, reasoned answers to both granular and global queries, synthesize knowledge across multiple documents, and explicitly cite supporting sources. 
 
 ## Overview
-The system utilizes an advanced Retrieval-Augmented Generation (RAG) architecture enhanced by the RAPTOR (Recursive Abstractive Processing for Tree-Organized Retrieval) methodology. Rather than relying on simple semantic similarity, the system builds a hierarchical Knowledge Graph. It clusters related document chunks, summarizes them using a local Large Language Model (LLM), and recursively embeds the summaries. This dual-pipeline architecture (Ingestion and Retrieval) runs entirely on open-source and open-weight software optimized for an NVIDIA DGX Spark (128GB RAM limit).
+The system utilizes an advanced Retrieval-Augmented Generation (RAG) architecture enhanced by the RAPTOR (Recursive Abstractive Processing for Tree-Organized Retrieval) methodology. Rather than relying on simple semantic similarity, the system builds a hierarchical Knowledge Tree. It clusters related document chunks, summarizes them using a local Large Language Model (LLM), and recursively embeds the summaries. This dual-pipeline architecture (Ingestion and Retrieval) runs entirely on open-source and open-weight software optimized for an NVIDIA DGX Spark (128GB RAM limit).
 
 ## Detailed Design
 
@@ -51,7 +51,7 @@ The system utilizes an advanced Retrieval-Augmented Generation (RAG) architectur
 ### 3. Clustering & Summarization (RAPTOR Pipeline)
 To enable holistic reasoning across the corpus, data is grouped and summarized hierarchically:
 *   **Metadata Partitioning:** Vectors are first bucketed by metadata (e.g., Department, Year) into batches of 20,000 to 40,000 chunks to prevent memory overflow.
-*   **GPU Clustering:** [NVIDIA FAISS](https://github.com/facebookresearch/faiss) runs GPU-accelerated K-Means clustering on the buckets to group related chunks across different documents (with K=200 to 400 clusters per batch, maintaining a 100:1 compression ratio).
+*   **GPU Clustering:** [NVIDIA FAISS](https://github.com/facebookresearch/faiss) runs GPU-accelerated K-Means clustering on the buckets to group related chunks across different documents (with K=200 to 400 clusters per batch, maintaining a 100:1 compression ratio; lower ratio gains accuracy on small signals but costs more in ingestion time and run-time).
 *   **Summarization:** A dedicated Summarization LLM (highly recommended: **Meta Llama-3.1-8B-Instruct** deployed via **vLLM** for maximum batch-processing throughput on English corpora) reads the concatenated text of each cluster and generates a comprehensive summary. This new summary text is then embedded and pushed back into the vector database, explicitly storing the source document citations of all underlying child nodes as metadata to preserve accurate lineage and attribution.
 *   **Recursion:** Summaries are clustered and summarized iteratively until a "Root Node" executive summary is reached.
 
