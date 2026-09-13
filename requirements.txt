@@ -1,7 +1,7 @@
 # ==========================================
 # 1. Core Framework (The Orchestrator)
 # ==========================================
-llama-index
+llama-index>=0.10.0
 llama-index-core
 
 # ==========================================
@@ -15,7 +15,7 @@ llama-index-llms-openai              # Contains OpenAILike (used to connect to l
 # 3. Vector DB & Clustering (RAPTOR)
 # ==========================================
 qdrant-client                        # Qdrant python driver
-faiss-gpu                            # NVIDIA GPU-accelerated K-Means clustering (Crucial for DGX)
+faiss-gpu-cu12                       # Using modern CUDA 12 wheel for pip stability
 numpy                                # Standard math arrays (used heavily by FAISS)
 
 # ==========================================
@@ -37,8 +37,3 @@ sqlalchemy                           # Required by LlamaIndex to build the Text-
 fastapi                              # Web framework for serve_api.py
 uvicorn[standard]                    # ASGI server to run FastAPI
 pydantic                             # Data validation for the Chat API payload
-
-# ==========================================
-# 7. Local LLM Inference Engine
-# ==========================================
-vllm                                 # HuggingFace model serving (Must be run on Linux/CUDA)
