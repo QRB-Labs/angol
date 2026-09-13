@@ -1,3 +1,12 @@
+'''
+This is the **Middleware**. Its job is to:
+1. Pretend to be an OpenAI API server so Open WebUI can talk to it.
+2. Intercept the user's question from the frontend.
+3. Use the LlamaIndex library to search your Qdrant database.
+4. Package the retrieved documents and the user's question into a prompt.
+5. Send that packaged prompt to vLLM to get the final answer.
+6. Pass the answer back up to Open WebUI.
+'''
 from fastapi import FastAPI
 from pydantic import BaseModel
 from llama_index.llms.openai_like import OpenAILike
