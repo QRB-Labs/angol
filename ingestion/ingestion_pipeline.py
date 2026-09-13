@@ -23,13 +23,20 @@ def main():
 
     # 3a. Inject RAPTOR Metadata
     # Tag all these chunks as Level 0 so the clustering algorithm knows they are raw text
-    for node in nodes:
+    # "category" corresponds to buckets for clustering, one bucket for roughly every 1 GB of raw text (~500,000 nodes)
+    NODES_PER_BUCKET = 500000
+    unique_categories = set()
+
+    for i, node in enumerate(nodes):
         node.metadata["raptor_level"] = 0
+        bucket_name = f"bucket_{i // NODES_PER_BUCKET}"
+        node.metadata["category"] = bucket_name
+        unique_categories.add(bucket_name)
 
     # 3b. Configure LlamaIndex to talk to Qdrant
     vector_store = QdrantVectorStore(
         client=db_client,
-        collection_name="enterprise_brain"
+        collection_name="angol"
     )
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
@@ -47,7 +54,13 @@ def main():
     # 4. Run RAPTOR Pipeline (100:1 Compression)
     # This function uses FAISS to cluster, then calls the local Llama-8B (Port 8000)
     # to summarize, then embeds the summaries and pushes to Qdrant.
-    run_faiss_clustering_and_summarize(db_client, embed_model)
+    run_faiss_clustering_and_summarize(
+        db_client=db_client,
+        embed_model=embed_model,
+        bucket_key="category",
+        unique_buckets=list(unique_categories)
+    )
+
 
 if __name__ == "__main__":
     main()
