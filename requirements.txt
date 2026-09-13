@@ -1,0 +1,44 @@
+# ==========================================
+# 1. Core Framework (The Orchestrator)
+# ==========================================
+llama-index
+llama-index-core
+
+# ==========================================
+# 2. LlamaIndex Integrations
+# ==========================================
+llama-index-embeddings-huggingface   # For local BGE-M3 embedding initialization
+llama-index-vector-stores-qdrant     # For connecting LlamaIndex to Qdrant
+llama-index-llms-openai              # Contains OpenAILike (used to connect to local vLLM)
+
+# ==========================================
+# 3. Vector DB & Clustering (RAPTOR)
+# ==========================================
+qdrant-client                        # Qdrant python driver
+faiss-gpu                            # NVIDIA GPU-accelerated K-Means clustering (Crucial for DGX)
+numpy                                # Standard math arrays (used heavily by FAISS)
+
+# ==========================================
+# 4. Document Parsing & Data Handling
+# ==========================================
+docling                              # IBM's advanced layout-aware PDF/PPT OCR parser
+pandas                               # For parsing massive CSV/Excel sheets
+openpyxl                             # Required by Pandas to read .xlsx files
+
+# ==========================================
+# 5. SQL Agent & Database (PostgreSQL)
+# ==========================================
+psycopg2-binary                      # Postgres driver for Python
+sqlalchemy                           # Required by LlamaIndex to build the Text-to-SQL tool
+
+# ==========================================
+# 6. Serving Middleware (API)
+# ==========================================
+fastapi                              # Web framework for serve_api.py
+uvicorn[standard]                    # ASGI server to run FastAPI
+pydantic                             # Data validation for the Chat API payload
+
+# ==========================================
+# 7. Local LLM Inference Engine
+# ==========================================
+vllm                                 # HuggingFace model serving (Must be run on Linux/CUDA)
