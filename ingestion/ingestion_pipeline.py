@@ -17,20 +17,28 @@ def main():
     docs = extract_markdown(raw_dir)
 
     # 3. Chunk into Level 0 Leaf Nodes
-    splitter = SemanticSplitterNodeParser(buffer_size=1, breakpoint_percentile_threshold=95)
+    splitter = SemanticSplitterNodeParser(
+        buffer_size=1,
+        breakpoint_percentile_threshold=95,
+        embed_model=embed_model
+    )
     nodes = splitter.get_nodes_from_documents(docs)
     print(f"Processing {len(nodes)} Level 0 Leaf Nodes...")
 
     # 3a. Inject RAPTOR Metadata
     # Tag all these chunks as Level 0 so the clustering algorithm knows they are raw text
-    # "category" corresponds to buckets for clustering, one bucket for roughly every 1 GB of raw text (~500,000 nodes)
+
+    # "bucket" corresponds to buckets for clustering, which we need so a) data is
+    # small enough for clustering, and/or better semantic groups for
+    # clustering e.g, engineering docs, sales docs etc. BY default we
+    # use one bucket for ~ 1 GB of raw text (~500,000 nodes).
     NODES_PER_BUCKET = 500000
     unique_categories = set()
 
     for i, node in enumerate(nodes):
         node.metadata["raptor_level"] = 0
         bucket_name = f"bucket_{i // NODES_PER_BUCKET}"
-        node.metadata["category"] = bucket_name
+        node.metadata["bucket"] = bucket_name
         unique_categories.add(bucket_name)
 
     # 3b. Configure LlamaIndex to talk to Qdrant
@@ -57,8 +65,9 @@ def main():
     run_faiss_clustering_and_summarize(
         db_client=db_client,
         embed_model=embed_model,
-        bucket_key="category",
-        unique_buckets=list(unique_categories)
+        bucket_key="bucket",
+        unique_buckets=list(unique_categories),
+        collection_name="angol"
     )
 
 

@@ -17,7 +17,6 @@ VLLM_API_BASE = os.getenv("VLLM_API_BASE", "http://localhost:8000/v1")
 llm_client = OpenAI(base_url=VLLM_API_BASE, api_key="local")
 MODEL_NAME = "meta-llama/Meta-Llama-3.1-8B-Instruct"
 
-COLLECTION_NAME = "angol"
 MAX_TOKENS_PER_CLUSTER = 6000
 CHUNK_SIZE_ESTIMATE = 500
 
@@ -35,12 +34,13 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
     for n in cluster_nodes:
         if level == 1:
             citations.append({
-                "doc_id": n["metadata"].get("doc_id", "Unknown"),
+                "file_name": n["metadata"].get("file_name", "Unknown"),
                 "page": n["metadata"].get("page", "Unknown")
             })
         else:
             citations.extend(n["metadata"].get("child_citations", []))
 
+    # Deduplicate citations (since dicts aren't hashable, convert to tuple of items)
     unique_citations = [dict(t) for t in {tuple(d.items()) for d in citations}]
 
     prompt = (
@@ -63,7 +63,7 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
 
     return {"text": summary_text, "citations": unique_citations}
 
-def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="category", unique_buckets=None):
+def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucket", unique_buckets=None, collection_name="angol"):
     if unique_buckets is None:
         unique_buckets = ["default"]
 
@@ -83,7 +83,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="categ
             bucket_filter = Filter(must=must_conditions)
 
             records, next_page = db_client.scroll(
-                collection_name=COLLECTION_NAME,
+                collection_name=collection_name,
                 scroll_filter=bucket_filter,
                 limit=10000,
                 with_payload=True,
@@ -93,7 +93,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="categ
             all_records = list(records)
             while next_page:
                 records, next_page = db_client.scroll(
-                    collection_name=COLLECTION_NAME,
+                    collection_name=collection_name,
                     scroll_filter=bucket_filter,
                     limit=10000,
                     offset=next_page,
@@ -158,7 +158,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="categ
             if new_summary_nodes:
                 logger.info(f"Pushing {len(new_summary_nodes)} Level {next_level} summaries to Qdrant for bucket {bucket_value}...")
 
-                vector_store = QdrantVectorStore(client=db_client, collection_name=COLLECTION_NAME)
+                vector_store = QdrantVectorStore(client=db_client, collection_name=collection_name)
                 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
                 VectorStoreIndex(
