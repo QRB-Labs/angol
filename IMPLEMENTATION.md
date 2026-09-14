@@ -9,11 +9,10 @@
 
 ---
 ### Phase 1: Environment Setup & Core Infrastructure
-Before writing any Python code, you must initialize the local vector database, SQL database, and AI inference servers using Docker.
 
-*1. Environment**
+**1. Environment**
 
-Set up a clean standard Python virtual environment. Install system dependencies required for document parsing (Docling), and use standard pip for Python packages. vLLM will be run via Docker to prevent PyTorch dependency conflicts.
+Set up a clean standard Python virtual environment. Install system dependencies required for document parsing (Docling), and use standard pip for Python packages. 
 
 *   **System Dependencies (Required for Docling):**
 
@@ -38,8 +37,8 @@ Set up a clean standard Python virtual environment. Install system dependencies 
 
 
 **3. Model Serving Engine (vLLM & Orchestrator)**
-We use vLLM via Docker to serve open-weight models as local, OpenAI-compatible APIs (preventing PyTorch dependency conflicts in our Python environment).
-Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.sh) automatically toggles between the Ingestion LLM (8B) and the Serving LLM (32B).
+We use vLLM in a separate docker container to serve open-weight models as local, OpenAI-compatible APIs (preventing PyTorch dependency conflicts in our Python environment).
+Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.sh) automatically toggles between the Ingestion LLM (8B) and the Serving LLM (32B) in their own containers.
 *   **Command:** `./orchestrator.sh` *(Note: In production, this is designed to be run nightly via a cron job).*
 
 
