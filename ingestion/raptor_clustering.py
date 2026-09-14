@@ -63,7 +63,7 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
 
     return {"text": summary_text, "citations": unique_citations}
 
-def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucket", unique_buckets=None, collection_name="angol"):
+def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets=None, collection_name="angol"):
     if unique_buckets is None:
         unique_buckets = ["default"]
 
@@ -85,7 +85,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucke
 
             # Only apply the bucket filter if not doing a global pass
             if bucket_value != "default":
-                must_conditions.append(FieldCondition(key=bucket_key, match=MatchValue(value=bucket_value)))
+                must_conditions.append(FieldCondition(key="bucket", match=MatchValue(value=bucket_value)))
 
             level_filter = Filter(must=must_conditions)
             # Scroll Qdrant based on the dynamic filter

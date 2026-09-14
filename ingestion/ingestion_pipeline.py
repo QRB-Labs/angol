@@ -64,7 +64,6 @@ def main():
     run_faiss_clustering_and_summarize(
         db_client=db_client,
         embed_model=embed_model,
-        bucket_key="bucket",
         unique_buckets=list(unique_buckets),
         collection_name="angol"
     )
