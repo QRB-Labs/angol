@@ -1,3 +1,13 @@
+# Angol: Implementation notes
+
+## Table of Contents
+- [Phase 1: Environment Setup & Core Infrastructure](#phase-1-environment-setup--core-infrastructure)
+- [Phase 2: Ingestion & RAPTOR Pipeline (Background Process)](#phase-2-ingestion--raptor-pipeline-background-process)
+- [Phase 3: Retrieval, Reasoning & Serving](#phase-3-retrieval-reasoning--serving)
+- [Phase 4: User Interface (Frontend)](#phase-4-user-interface-frontend)
+- [Directory Structure](#directory-structure)
+
+---
 ### Phase 1: Environment Setup & Core Infrastructure
 Before writing any Python code, you must initialize the local vector database, SQL database, and AI inference servers using Docker.
 
