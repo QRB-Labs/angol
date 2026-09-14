@@ -50,29 +50,13 @@ This phase is executed by a heavy Python script (`ingestion_pipeline.py`) run du
     *   Pass the parsed Markdown to LlamaIndex's `SemanticSplitterNodeParser`.
     *   Load the embedding model locally: `embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3")`.
     *   Embed all chunks (Level 0 Leaf Nodes).
-4.  **RAPTOR Clustering Loop (FAISS + vLLM):**
-    ```python
-    # Pseudo-code for RAPTOR clustering
-    for bucket in metadata_buckets: # 20k-40k chunks
-        vectors = extract_vectors(bucket)
-        
-        # 1. GPU Clustering
-        kmeans = faiss.Kmeans(d=1024, k=200, niter=20, gpu=True)
-        kmeans.train(vectors)
-        clusters = kmeans.assign(vectors)
-        
-        # 2. Summarization
-        for cluster in clusters:
-            combined_text = concat_chunks(cluster)
-            prompt = generate_summary_prompt(combined_text)
-            
-            # API call to local vLLM (Llama-3.1-8B)
-            summary_text = vllm_client.chat.completions.create(prompt) 
-            
-            # 3. Re-Embed & Push to DB
-            summary_vector = embed_model.get_text_embedding(summary_text)
-            qdrant_client.upsert(summary_vector, payload=metadata_and_citations)
-    ```
+4. **Recursive RAPTOR Clustering ([`ingestion/raptor_clustering.py`](ingestion/raptor_clustering.py)):**
+    Instead of a flat pass, the pipeline recursively builds a hierarchical semantic tree (up to `max_levels`).
+    * **Loop Levels:** Starting at `raptor_level=0` (leaf nodes), the system fetches vectors bucket-by-bucket to respect the 128GB RAM limit.
+    * **Cluster:** FAISS K-Means groups semantically similar chunks within the current bucket and level.
+    * **Summarize:** Local Llama-3.1-8B (via vLLM) synthesizes each cluster into a single overarching summary node, inheriting deduplicated `child_citations`.
+    * **Re-Embed:** Summaries are embedded (BGE-M3) and upserted to Qdrant tagged as `raptor_level = current_level + 1`.
+    * **Recurse:** The process repeats on the newly generated summary nodes until the tree root is reached or node counts fall below the clustering threshold.    ```
 
 ---
 

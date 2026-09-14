@@ -40,7 +40,7 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
         else:
             citations.extend(n["metadata"].get("child_citations", []))
 
-    # Deduplicate citations (since dicts aren't hashable, convert to tuple of items)
+    # Deduplicate citations
     unique_citations = [dict(t) for t in {tuple(d.items()) for d in citations}]
 
     prompt = (
@@ -73,18 +73,31 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucke
     while current_level < max_levels:
         logger.info(f"--- Processing RAPTOR Level {current_level} ---")
 
-        for bucket_value in unique_buckets:
-            logger.info(f"--- Processing Bucket: {bucket_key} = {bucket_value} ---")
+        # Bucketize Level 0. Global pass for Level 1+
+        if current_level == 0:
+            active_iteration = unique_buckets
+        else:
+            active_iteration = ["GLOBAL_PASS"]
 
+        for bucket_value in active_iteration:
+            if bucket_value == "GLOBAL_PASS":
+                logger.info(f"--- Executing GLOBAL Clustering for Level {current_level} ---")
+            else:
+                logger.info(f"--- Processing Bucket: {bucket_key} = {bucket_value} at Level {current_level} ---")
+
+            # Always filter by the current RAPTOR level
             must_conditions = [FieldCondition(key="raptor_level", match=MatchValue(value=current_level))]
-            if bucket_value != "default":
+
+            # Only apply the bucket filter if we are at Level 0
+            if current_level == 0 and bucket_value != "default":
                 must_conditions.append(FieldCondition(key=bucket_key, match=MatchValue(value=bucket_value)))
 
-            bucket_filter = Filter(must=must_conditions)
+            level_filter = Filter(must=must_conditions)
 
+            # Scroll Qdrant based on the dynamic filter
             records, next_page = db_client.scroll(
                 collection_name=collection_name,
-                scroll_filter=bucket_filter,
+                scroll_filter=level_filter,
                 limit=10000,
                 with_payload=True,
                 with_vectors=True
@@ -94,7 +107,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucke
             while next_page:
                 records, next_page = db_client.scroll(
                     collection_name=collection_name,
-                    scroll_filter=bucket_filter,
+                    scroll_filter=level_filter,
                     limit=10000,
                     offset=next_page,
                     with_payload=True,
@@ -103,7 +116,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucke
                 all_records.extend(records)
 
             if not all_records or len(all_records) < 2:
-                logger.info(f"Not enough nodes to cluster in bucket {bucket_value}. Skipping.")
+                logger.info(f"Not enough nodes to cluster. Skipping.")
                 continue
 
             embeddings = np.array([r.vector for r in all_records], dtype=np.float32)
@@ -134,7 +147,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucke
             next_level = current_level + 1
             new_summary_nodes = []
 
-            logger.info(f"Sending {len(clusters)} clusters to Llama-8B for bucket {bucket_value}...")
+            logger.info(f"Sending {len(clusters)} clusters to Llama-8B...")
             with ThreadPoolExecutor(max_workers=10) as executor:
                 future_to_cluster = {
                     executor.submit(summarize_cluster, nodes, next_level): nodes
@@ -148,15 +161,14 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucke
                         text=result["text"],
                         metadata={
                             "raptor_level": next_level,
-                            "child_citations": result["citations"],
-                            bucket_key: bucket_value
+                            "child_citations": result["citations"]
                         },
                         excluded_embed_metadata_keys=["child_citations"]
                     )
                     new_summary_nodes.append(node)
 
             if new_summary_nodes:
-                logger.info(f"Pushing {len(new_summary_nodes)} Level {next_level} summaries to Qdrant for bucket {bucket_value}...")
+                logger.info(f"Pushing {len(new_summary_nodes)} Level {next_level} summaries to Qdrant...")
 
                 vector_store = QdrantVectorStore(client=db_client, collection_name=collection_name)
                 storage_context = StorageContext.from_defaults(vector_store=vector_store)

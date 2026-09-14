@@ -28,18 +28,17 @@ def main():
     # 3a. Inject RAPTOR Metadata
     # Tag all these chunks as Level 0 so the clustering algorithm knows they are raw text
 
-    # "bucket" corresponds to buckets for clustering, which we need so a) data is
-    # small enough for clustering, and/or better semantic groups for
-    # clustering e.g, engineering docs, sales docs etc. BY default we
-    # use one bucket for ~ 1 GB of raw text (~500,000 nodes).
+    # Clustering is done in "buckets" for
+    # a) memory management: by default 1 bucket for ~ 1 GB of raw text (~500,000 nodes)
+    # b) semantic groups using metadata (e.g. file_path) picked up during parsing
     NODES_PER_BUCKET = 500000
-    unique_categories = set()
+    unique_buckets = set()
 
     for i, node in enumerate(nodes):
         node.metadata["raptor_level"] = 0
         bucket_name = f"bucket_{i // NODES_PER_BUCKET}"
         node.metadata["bucket"] = bucket_name
-        unique_categories.add(bucket_name)
+        unique_buckets.add(bucket_name)
 
     # 3b. Configure LlamaIndex to talk to Qdrant
     vector_store = QdrantVectorStore(
@@ -66,7 +65,7 @@ def main():
         db_client=db_client,
         embed_model=embed_model,
         bucket_key="bucket",
-        unique_buckets=list(unique_categories),
+        unique_buckets=list(unique_buckets),
         collection_name="angol"
     )
 
