@@ -71,29 +71,23 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, bucket_key="bucke
     max_levels = 3
 
     while current_level < max_levels:
-        logger.info(f"--- Processing RAPTOR Level {current_level} ---")
-
         # Bucketize Level 0. Global pass for Level 1+
         if current_level == 0:
             active_iteration = unique_buckets
         else:
-            active_iteration = ["GLOBAL_PASS"]
+            active_iteration = ["default"]
 
         for bucket_value in active_iteration:
-            if bucket_value == "GLOBAL_PASS":
-                logger.info(f"--- Executing GLOBAL Clustering for Level {current_level} ---")
-            else:
-                logger.info(f"--- Processing Bucket: {bucket_key} = {bucket_value} at Level {current_level} ---")
+            logger.info(f"Processing Level {current_level} Bucket {bucket_value}")
 
             # Always filter by the current RAPTOR level
             must_conditions = [FieldCondition(key="raptor_level", match=MatchValue(value=current_level))]
 
-            # Only apply the bucket filter if we are at Level 0
-            if current_level == 0 and bucket_value != "default":
+            # Only apply the bucket filter if not doing a global pass
+            if bucket_value != "default":
                 must_conditions.append(FieldCondition(key=bucket_key, match=MatchValue(value=bucket_value)))
 
             level_filter = Filter(must=must_conditions)
-
             # Scroll Qdrant based on the dynamic filter
             records, next_page = db_client.scroll(
                 collection_name=collection_name,
