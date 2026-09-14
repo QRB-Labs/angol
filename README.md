@@ -10,7 +10,7 @@ Corpus: Up to 1TB of documents
 Runs locally on a NDVIDIA GDX Spark or less.
 -->
 
-# High-Level Design: Enterprise AI 
+# Angol Enterprise AI - High-level design
 
 - [Objective](#objective)
 - [Overview](#overview)
