@@ -2,7 +2,8 @@
 Before writing any Python code, you must initialize the local vector database, SQL database, and AI inference servers using Docker.
 
 **1. Infrastructure (Docker Compose)**
-Create a `docker-compose.yml` to host Qdrant (Vector DB) and PostgreSQL (Spreadsheet DB).
+
+[`docker-compose.yml`](docker-compose.yml) spins up the three services without overlapping ports:  Qdrant (Vector DB), PostgreSQL (Spreadsheet DB) and Open WebUI.
 *   **Command:** `docker compose up -d`
 *   *Note on Qdrant Config:* Ensure the Qdrant volume is mapped to a fast NVMe SSD path, and configure the payload storage to `mmap: true` and vectors to `quantization: int8`.
 
@@ -38,10 +39,12 @@ Set up a clean standard Python virtual environment. Install system dependencies 
 ```		
 		
 **3. Model Serving Engine (vLLM)**
-We use vLLM to serve open-weight models as local, OpenAI-compatible APIs. Because of the 128GB RAM limit, a shell script [orchestrator.sh](orchestrator.sh) toggles between the Ingestion LLM and the Serving LLM.
+We use vLLM to serve open-weight models as local, OpenAI-compatible APIs. Because of the 128GB RAM limit, a shell script [orchestrator.sh](orchestrator.sh) toggles between the Ingestion LLM  (8B) and the Serving LLM (32B). It is designed to be run e.g. nightly via a cron job.
 
 ### Phase 2: Ingestion & RAPTOR Pipeline (Background Process)
-This phase is executed by a heavy Python script (`ingestion_pipeline.py`) run during off-hours (e.g., via a Cron job) while the Llama-3.1-8B model is loaded in vLLM.
+This phase is executed by a heavy Python script (`ingestion_pipeline.py`) run during off-hours while the Llama-3.1-8B model is loaded in vLLM.
+
+[`ingestion/ingestion_pipeline.py`](ingestion/ingestion_pipeline.py) (the RAPTOR Engine) reads the raw documents, chunks them, and builds the hierarchical tree.
 
 **High-Level Structure of `ingestion_pipeline.py`:**
 1.  **Parse Documents:** Use `docling` to iterate through the target directory, converting PDFs/PPTs to Markdown and mapping metadata.
@@ -61,9 +64,12 @@ This phase is executed by a heavy Python script (`ingestion_pipeline.py`) run du
 ---
 
 ### Phase 3: Retrieval, Reasoning & Serving
-Once ingestion is complete, shut down the Llama-8B vLLM instance and start the Qwen-32B vLLM instance.
+Once ingestion is complete, orchestrator shuts down the Llama-8B vLLM instance and starts the Qwen-32B vLLM instance.
 
-To connect Qwen-32B to Open WebUI seamlessly, we need a "Middleware API" (`serve_api.py`). This script uses FastAPI to expose LlamaIndex's Router and Qdrant integration as a standard chat endpoint.
+To connect Qwen-32B to Open WebUI seamlessly, we need a "Middleware API" [`serving/serve_api.py`](serving/serve_api.py).
+Uses FastAPI to expose LlamaIndex's Router and Qdrant integration as a standard chat endpoint.
+Translates Open WebUI's OpenAI-style requests into LlamaIndex orchestrations, routing between SQL and the RAPTOR Vector DB.
+
 
 **High-Level Structure of `serve_api.py`:**
 1.  **Initialize DB Connections:** Connect LlamaIndex to Qdrant (Vector DB) and PostgreSQL (SQL DB).
@@ -136,19 +142,6 @@ angol/
 
 ---
 
-### Core Files & Scripts Definition
-
-#### 1. [`docker-compose.yml`](docker-compose.yml) (The Infrastructure)
-This spins up the three core databases/UIs without overlapping ports.
-
-#### 2. [`orchestrator.sh`](orchestrator.sh) (The Dual-LLM Manager)
-This script executes **Option B** (Sequential Deployment) to strictly respect the 128GB RAM limit. It is designed to be run nightly via a Cron job.
-
-#### 3. [`ingestion/ingestion_pipeline.py`](ingestion/ingestion_pipeline.py) (The RAPTOR Engine)
-This script reads the raw documents, chunks them, and builds the hierarchical tree.
-
-#### 4. [`serving/serve_api.py`](serving/serve_api.py) (The Middleware)
-This translates Open WebUI's OpenAI-style requests into LlamaIndex orchestrations, routing between SQL and the RAPTOR Vector DB.
 
 ### Steps for Execution:
 1.  Run `pip install -r requirements.txt`.
