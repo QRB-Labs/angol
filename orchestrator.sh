@@ -38,14 +38,14 @@ docker stop vllm-model
 docker rm vllm-model
 sleep 10
 
-# 5. Start Serving LLM (Qwen-32B) for User Queries
-echo "Loading Qwen-2.5-32B-Instruct into VRAM via Docker..."
+# 5. Start Serving LLM (Qwen-32B-AWQ) for User Queries
+echo "Loading Qwen-2.5-32B-Instruct-AWQ into VRAM via Docker..."
 docker run -d --name vllm-model --gpus all \
     -p 8000:8000 \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --ipc=host \
     vllm/vllm-openai:latest \
-    --model Qwen/Qwen2.5-32B-Instruct \
+    --model Qwen/Qwen2.5-32B-Instruct-AWQ \
     --max-model-len 16384
 
 wait_for_vllm
