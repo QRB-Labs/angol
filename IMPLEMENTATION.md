@@ -49,7 +49,7 @@ Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.
 This phase is executed by a heavy Python script run by the orchestrator while the 8B model is loaded in vLLM.
 [`ingestion/ingestion_pipeline.py`](ingestion/ingestion_pipeline.py) (the RAPTOR Engine) reads the raw documents, chunks them, and builds the hierarchical tree.
 
-**High-Level Structure: **
+**High-Level Structure:**
 1.  **Parse Documents:** Use `docling` to iterate through the target directory, converting PDFs/PPTs to Markdown and mapping metadata.
 2.  **SQL Routing (Spreadsheets):** If a file is a massive CSV/XLSX, use `pandas` to write it directly to the local PostgreSQL database using `psycopg2`.
 3.  **Chunk & Embed:**
