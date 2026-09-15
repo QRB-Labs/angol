@@ -43,13 +43,13 @@ Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.
 *   **Command:** `./orchestrator.sh` 
 *   *Note:* In production, this is designed to be run nightly via a cron job).
 
-
+---
 ### Phase 2: Ingestion & RAPTOR Pipeline (Background Process)
-This phase is executed by a heavy Python script (`ingestion_pipeline.py`) run during off-hours while the Llama-3.1-8B model is loaded in vLLM.
 
+This phase is executed by a heavy Python script run by the orchestrator while the 8B model is loaded in vLLM.
 [`ingestion/ingestion_pipeline.py`](ingestion/ingestion_pipeline.py) (the RAPTOR Engine) reads the raw documents, chunks them, and builds the hierarchical tree.
 
-**High-Level Structure of `ingestion_pipeline.py`:**
+**High-Level Structure: **
 1.  **Parse Documents:** Use `docling` to iterate through the target directory, converting PDFs/PPTs to Markdown and mapping metadata.
 2.  **SQL Routing (Spreadsheets):** If a file is a massive CSV/XLSX, use `pandas` to write it directly to the local PostgreSQL database using `psycopg2`.
 3.  **Chunk & Embed:**
@@ -67,14 +67,13 @@ This phase is executed by a heavy Python script (`ingestion_pipeline.py`) run du
 ---
 
 ### Phase 3: Retrieval, Reasoning & Serving
+
 Once ingestion is complete, orchestrator shuts down the Llama-8B vLLM instance and starts the Qwen-32B vLLM instance.
 
-To connect Qwen-32B to Open WebUI seamlessly, we need a "Middleware API" [`serving/serve_api.py`](serving/serve_api.py).
-Uses FastAPI to expose LlamaIndex's Router and Qdrant integration as a standard chat endpoint.
+To connect Qwen-32B to Open WebUI seamlessly, we need  "middleware", implemented in [`serving/serve_api.py`](serving/serve_api.py). Uses FastAPI to expose LlamaIndex's Router and Qdrant integration as a standard chat endpoint.
 Translates Open WebUI's OpenAI-style requests into LlamaIndex orchestrations, routing between SQL and the RAPTOR Vector DB.
 
-
-**High-Level Structure of `serve_api.py`:**
+**High-Level Structure:**
 1.  **Initialize DB Connections:** Connect LlamaIndex to Qdrant (Vector DB) and PostgreSQL (SQL DB).
 2.  **Define Engines:**
 	*   `vector_tool = QueryEngineTool(engine=qdrant_engine, description="Use for PDFs, text, and concepts.")`
