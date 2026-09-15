@@ -40,7 +40,8 @@ Set up a clean standard Python virtual environment. Install system dependencies 
 
 We use vLLM in a separate docker container to serve open-weight models as local, OpenAI-compatible APIs (preventing PyTorch dependency conflicts in our Python environment).
 Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.sh) automatically toggles between the Ingestion LLM (8B) and the Serving LLM (32B) in their own containers.
-*   **Command:** `./orchestrator.sh` *(Note: In production, this is designed to be run nightly via a cron job).*
+*   **Command:** `./orchestrator.sh` 
+*   *Note:* In production, this is designed to be run nightly via a cron job).
 
 
 ### Phase 2: Ingestion & RAPTOR Pipeline (Background Process)
