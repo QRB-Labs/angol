@@ -1,5 +1,13 @@
 #!/bin/bash
-echo "Starting Enterprise Brain Nightly Cycle..."
+echo "Starting Angol Cycle..."
+
+# Ensure we are in the project root directory
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_DIR" || exit 1
+
+# Define absolute paths to virtual environment executables
+VENV_PYTHON="${PROJECT_DIR}/angol_env/bin/python"
+VENV_UVICORN="${PROJECT_DIR}/angol_env/bin/uvicorn"
 
 wait_for_vllm() {
     echo "Waiting for vLLM to be ready on port 8000..."
@@ -13,7 +21,7 @@ wait_for_vllm() {
 echo "Shutting down Serving Model and Middleware..."
 docker stop vllm-model 2>/dev/null
 docker rm vllm-model 2>/dev/null
-pkill -f "uvicorn serving.serve_api:app"
+pkill -f "serving.serve_api:app"
 sleep 10 # Allow VRAM to clear completely
 
 # 2. Start Ingestion LLM (Llama-8B) for RAPTOR Summarization
@@ -30,7 +38,7 @@ wait_for_vllm
 
 # 3. Run the heavy RAPTOR Ingestion Pipeline
 echo "Running RAPTOR Clustering & Parsing..."
-python ingestion/ingestion_pipeline.py
+$VENV_PYTHON ingestion/ingestion_pipeline.py
 
 # 4. Unload Ingestion LLM from VRAM
 echo "Unloading Ingestion Model..."
@@ -52,6 +60,6 @@ wait_for_vllm
 
 # 6. Start FastAPI Middleware
 echo "Starting LlamaIndex Routing API..."
-uvicorn serving.serve_api:app --host 0.0.0.0 --port 8081 &
+$VENV_UVICORN serving.serve_api:app --host 0.0.0.0 --port 8081 &
 
 echo "System ready for daily user queries!"
