@@ -56,7 +56,8 @@ docker run -d --name vllm-model --gpus all \
     --ipc=host \
     vllm/vllm-openai:latest \
     --model Qwen/Qwen2.5-32B-Instruct-AWQ \
-    --max-model-len 16384
+    --max-model-len 4096 \
+    --gpu-memory-utilization 0.96
 
 wait_for_vllm
 
