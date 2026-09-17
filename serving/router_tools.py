@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 import qdrant_client
 from sqlalchemy import create_engine
 from llama_index.core import SQLDatabase
@@ -7,6 +8,8 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import VectorStoreIndex
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+load_dotenv()
 
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
