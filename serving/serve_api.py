@@ -24,7 +24,7 @@ app = FastAPI()
 local_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
     api_key=os.getenv("LLM_API_KEY"),
-    model="Qwen/Qwen2.5-32B-Instruct",
+    model="Qwen/Qwen2.5-14B-Instruct-AWQ",
     system_prompt=CITATION_SYSTEM_PROMPT
 )
 

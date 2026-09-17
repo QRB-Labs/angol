@@ -29,6 +29,6 @@ services:
     environment:
       # Points to the custom FastAPI middleware running on the host machine
       - OPENAI_API_BASE_URL=http://172.17.0.1:8081/v1
-      - OPENAI_API_KEY=local-key
+      - OPENAI_API_KEY=${LLM_API_KEY}
     volumes:
       - ./data/webui_storage:/app/backend/data
