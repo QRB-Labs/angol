@@ -10,6 +10,7 @@ llama-index-core
 llama-index-embeddings-huggingface   # For local BGE-M3 embedding initialization
 llama-index-vector-stores-qdrant     # For connecting LlamaIndex to Qdrant
 llama-index-llms-openai              # Contains OpenAILike (used to connect to local vLLM)
+llama-index-llms-openai-like
 
 # ==========================================
 # 3. Vector DB & Clustering (RAPTOR)
