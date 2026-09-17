@@ -38,3 +38,8 @@ sqlalchemy                           # Required by LlamaIndex to build the Text-
 fastapi                              # Web framework for serve_api.py
 uvicorn[standard]                    # ASGI server to run FastAPI
 pydantic                             # Data validation for the Chat API payload
+
+# ==========================================
+# 7. Environment & Configuration
+# ==========================================
+python-dotenv                        # For loading variables from docker-friendly .env files

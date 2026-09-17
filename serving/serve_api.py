@@ -7,6 +7,8 @@ This is the **Middleware**. Its job is to:
 5. Send that packaged prompt to vLLM to get the final answer.
 6. Pass the answer back up to Open WebUI.
 '''
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
 from llama_index.llms.openai_like import OpenAILike
@@ -14,12 +16,14 @@ from llama_index.core.query_engine import RouterQueryEngine
 from serving.router_tools import get_vector_tool, get_sql_tool
 from serving.prompt_templates import CITATION_SYSTEM_PROMPT
 
+load_dotenv()
+
 app = FastAPI()
 
 # Connect to Qwen-32B (currently running on port 8000)
 local_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
-    api_key="fake-key",
+    api_key=os.getenv("LLM_API_KEY"),
     model="Qwen/Qwen2.5-32B-Instruct",
     system_prompt=CITATION_SYSTEM_PROMPT
 )
