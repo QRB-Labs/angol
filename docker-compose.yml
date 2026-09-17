@@ -2,6 +2,7 @@ version: '3.8'
 services:
   qdrant:
     image: qdrant/qdrant:latest
+    restart: always
     ports:
       - "6333:6333"
     volumes:
@@ -10,6 +11,7 @@ services:
 
   postgres:
     image: postgres:15
+    restart: always
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: securepassword
@@ -21,8 +23,9 @@ services:
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
+    restart: always
     ports:
-      - "3000:8080" # Exposed on port 3000
+      - "80:8080" # Exposed on port 80 allowed by fw
     environment:
       # Points to the custom FastAPI middleware running on the host machine
       - OPENAI_API_BASE_URL=http://172.17.0.1:8081/v1
