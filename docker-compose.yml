@@ -13,9 +13,9 @@ services:
     image: postgres:15
     restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: securepassword
-      POSTGRES_DB: enterprise_sheets
+      POSTGRES_USER: ${PG_USER:-admin}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: angol_db
     ports:
       - "5432:5432"
     volumes:

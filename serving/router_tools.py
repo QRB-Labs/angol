@@ -16,7 +16,7 @@ PG_USER = os.getenv("PG_USER", "postgres")
 PG_PASSWORD = os.getenv("PG_PASSWORD", "postgres")
 PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = os.getenv("PG_PORT", "5432")
-PG_DB = os.getenv("PG_DB", "enterprise_data")
+PG_DB = os.getenv("PG_DB", "angol_db")
 
 def get_vector_tool(llm):
     client = qdrant_client.QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
