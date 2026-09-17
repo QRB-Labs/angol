@@ -12,6 +12,40 @@
 
 **1. Environment**
 
+We use **Ubuntu 22.04 LTS**, which natively provides Python 3.10. More recent versions (e.g. Ubuntu 26.04 with Python 3.14) have compatibility and driver compilation issues with GPU-accelerated libraries (like `faiss-gpu`).
+
+* **Hugging Face model repo access tokens**
+
+Even though we use open-soure, open-weight models, some require accepting access terms via Hugging Face. Get an access token from https://huggingface.co/settings/tokens and set it as an environment variable.
+
+
+```bash
+	export HUGGING_FACE_HUB_TOKEN="your_huggingface_token_here"
+```
+
+Then request access for specific models e.g. for Llama-3.1-8B go to https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct.
+
+*   **NVIDIA Host Drivers & Docker Toolkit (Required for GPU Access):**
+Ensure the host OS can see the GPU and install the toolkit required to pass it into Docker containers.
+
+```bash
+	sudo apt-get update
+	sudo apt-get install -y ubuntu-drivers-common
+	sudo ubuntu-drivers autoinstall
+	sudo reboot
+```
+
+After rebooting, install the NVIDIA Container Toolkit:
+
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
 Set up a clean standard Python virtual environment. Install system dependencies required for document parsing (Docling), and use standard pip for Python packages. 
 
 *   **System Dependencies (Required for Docling):**
@@ -24,6 +58,7 @@ Set up a clean standard Python virtual environment. Install system dependencies 
 *   **Python Virtual Environment:**
 
 ```bash
+	sudo apt install python3.10-venv
 	python3.10 -m venv angol_env
 	source angol_env/bin/activate
 	pip install -r requirements.txt
