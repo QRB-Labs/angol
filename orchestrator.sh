@@ -33,8 +33,8 @@ docker run -d --name vllm-model --gpus all \
     --ipc=host \
     vllm/vllm-openai:latest \
     --model meta-llama/Meta-Llama-3.1-8B-Instruct \
-    --max-model-len 8192 \
-    --gpu-memory-utilization 0.75
+    --max-model-len 4096 \
+    --gpu-memory-utilization 0.85
 
 wait_for_vllm
 
