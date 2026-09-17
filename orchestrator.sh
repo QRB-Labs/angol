@@ -27,6 +27,7 @@ sleep 10 # Allow VRAM to clear completely
 # 2. Start Ingestion LLM (Llama-8B) for RAPTOR Summarization
 echo "Loading Meta-Llama-3.1-8B-Instruct into VRAM via Docker..."
 docker run -d --name vllm-model --gpus all \
+    -e HUGGING_FACE_HUB_TOKEN="${HUGGING_FACE_HUB_TOKEN}" \
     -p 8000:8000 \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --ipc=host \
