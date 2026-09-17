@@ -24,17 +24,17 @@ docker rm vllm-model 2>/dev/null
 pkill -f "serving.serve_api:app"
 sleep 10 # Allow VRAM to clear completely
 
-# 2. Start Ingestion LLM (Llama-8B) for RAPTOR Summarization
-echo "Loading Meta-Llama-3.1-8B-Instruct into VRAM via Docker..."
+# 2. Start Ingestion LLM (Llama-8B AWQ) for RAPTOR Summarization
+echo "Loading Meta-Llama-3.1-8B-Instruct-AWQ into VRAM via Docker..."
 docker run -d --name vllm-model --gpus all \
     -e HUGGING_FACE_HUB_TOKEN="${HUGGING_FACE_HUB_TOKEN}" \
     -p 8000:8000 \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --ipc=host \
     vllm/vllm-openai:latest \
-    --model meta-llama/Meta-Llama-3.1-8B-Instruct \
+    --model hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 \
     --max-model-len 8192 \
-    --gpu-memory-utilization 0.75
+    --gpu-memory-utilization 0.50
 
 wait_for_vllm
 
