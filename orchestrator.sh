@@ -35,11 +35,6 @@ docker run -d --name vllm-model --gpus all \
     --model hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 \
     --max-model-len 8192 \
     --gpu-memory-utilization 0.50
-=======
-    --model meta-llama/Meta-Llama-3.1-8B-Instruct \
-    --max-model-len 4096 \
-    --gpu-memory-utilization 0.85
->>>>>>> 6241302008fe1455ad1c594d59460de295b3e25a
 
 wait_for_vllm
 
