@@ -40,7 +40,7 @@ wait_for_vllm
 
 # 3. Run the heavy RAPTOR Ingestion Pipeline
 echo "Running RAPTOR Clustering & Parsing..."
-$VENV_PYTHON ingestion/ingestion_pipeline.py
+$VENV_PYTHON ingestion/ingestion_pipeline.py --raw-dir "${PROJECT_DIR}/data/raw_documents/"
 
 # 4. Unload Ingestion LLM from VRAM
 echo "Unloading Ingestion Model..."
