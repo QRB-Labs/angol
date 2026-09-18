@@ -20,11 +20,11 @@ load_dotenv()
 
 app = FastAPI()
 
-# Connect to Qwen-32B (currently running on port 8000)
+# Connect to the local vLLM instance (currently running on port 8000)
 local_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
     api_key=os.getenv("OPENAI_API_KEY"),
-    model="Qwen/Qwen2.5-14B-Instruct-AWQ",
+    model=os.getenv("GENERATION_MODEL"),
     system_prompt=CITATION_SYSTEM_PROMPT,
     is_chat_model=True,          # <--- TELLS IT TO USE /v1/chat/completions
     max_tokens=1024,             # <--- PREVENTS THE RESPONSE FROM GETTING CUT OFF
@@ -63,7 +63,7 @@ async def chat_endpoint(request: ChatRequest):
     # Extract user prompt
     user_query = request.messages[-1]["content"]
     
-    # LlamaIndex routes, searches, and generates using Qwen
+    # LlamaIndex routes, searches, and generates using the local model
     response = router_engine.query(user_query)
     
     # Return in standard OpenAI JSON format to Open WebUI
