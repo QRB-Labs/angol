@@ -46,10 +46,15 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
     # Deduplicate citations
     unique_citations = [dict(t) for t in {tuple(d.items()) for d in citations}]
 
+    # The input text to summarize is cut-off at 15000 chars, which
+    # should give about 1000-5000 tokens.  The output summary has a
+    # max of 500 tokens. Combined we want them to be less than 8192
+    # tokens, the value of --max-model-len in vllm-model for ingestion
+    # model)
     prompt = (
         "You are an expert enterprise analyst. Synthesize and summarize the following text chunks.\n"
         "Identify the major themes, critical data points, and overarching narratives.\n\n"
-        f"TEXT TO SUMMARIZE:\n{combined_text[:20000]}"
+        f"TEXT TO SUMMARIZE:\n{combined_text[:15000]}"
     )
 
     try:
@@ -57,7 +62,7 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
             model=MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=750
+            max_tokens=500
         )
         summary_text = response.choices[0].message.content
     except Exception as e:
