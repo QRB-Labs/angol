@@ -5,6 +5,13 @@ echo "Starting Angol orchestrator..."
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR" || exit 1
 
+# Load .env variables into the bash environment
+if [ -f "${PROJECT_DIR}/.env" ]; then
+    set -a
+    source "${PROJECT_DIR}/.env"
+    set +a
+fi
+
 # Define absolute paths to virtual environment executables
 VENV_PYTHON="${PROJECT_DIR}/angol_env/bin/python"
 VENV_UVICORN="${PROJECT_DIR}/angol_env/bin/uvicorn"
@@ -24,15 +31,15 @@ docker rm vllm-model 2>/dev/null
 pkill -f "serving.serve_api:app"
 sleep 10 # Allow VRAM to clear completely
 
-# 2. Start Ingestion LLM (Llama-8B AWQ) for RAPTOR Summarization
-echo "Loading Meta-Llama-3.1-8B-Instruct-AWQ into VRAM via Docker..."
+# 2. Start Ingestion LLM for RAPTOR Summarization
+echo "Loading ${INGESTION_MODEL} into VRAM via Docker..."
 docker run -d --name vllm-model --gpus all \
-    --env_file "${PROJECT_DIR}/.env" \
+    --env-file "${PROJECT_DIR}/.env" \
     -p 8000:8000 \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --ipc=host \
     vllm/vllm-openai:latest \
-    --model hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 \
+    --model ${INGESTION_MODEL} \
     --max-model-len 8192 \
     --gpu-memory-utilization 0.50
 

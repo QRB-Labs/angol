@@ -3,6 +3,7 @@ import json
 import numpy as np
 import faiss
 import logging
+from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from openai import OpenAI
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
@@ -10,12 +11,14 @@ from llama_index.core.schema import TextNode
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import StorageContext, VectorStoreIndex
 
+load_dotenv()
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 VLLM_API_BASE = os.getenv("VLLM_API_BASE", "http://localhost:8000/v1")
 llm_client = OpenAI(base_url=VLLM_API_BASE, api_key="local")
-MODEL_NAME = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+MODEL_NAME = os.getenv("INGESTION_MODEL", "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4")
 
 MAX_TOKENS_PER_CLUSTER = 6000
 CHUNK_SIZE_ESTIMATE = 500
