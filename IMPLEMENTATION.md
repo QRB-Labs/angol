@@ -26,17 +26,12 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 	sudo apt-get install -y ubuntu-drivers-common
 	sudo ubuntu-drivers autoinstall
 	sudo reboot
-```
-
-After rebooting, install the NVIDIA Container Toolkit:
-
-```bash
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-sudo apt-get update
-sudo apt-get install -y nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
+ curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+ curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+ sudo apt-get update
+ sudo apt-get install -y nvidia-container-toolkit
+ sudo nvidia-ctk runtime configure --runtime=docker
+ sudo systemctl restart docker
 ```
 
 *   **System Dependencies (Required for Docling):**
@@ -121,7 +116,7 @@ Translates Open WebUI's OpenAI-style requests into LlamaIndex orchestrations, ro
 
 ### Phase 4: User Interface (Frontend)
 
-Open WebUI provide a ChatGPT-like experience for enterprise users. It connects to via `OPENAI_API_BASE_URL` to our custom `serve_api.py` (FastAPI) middleware, NOT directly to vLLM. This ensures Open WebUI triggers the LlamaIndex RAG/Routing pipeline rather than just talking to a "blank" LLM. Deployment of Open WebUI is handled by docker-compose.yml.  Open your browser to `http://localhost:3000` to query Angol.
+Open WebUI provide a ChatGPT-like experience for enterprise users. It connects to via `OPENAI_API_BASE_URL` to our custom `serve_api.py` (FastAPI) middleware, NOT directly to vLLM. This ensures Open WebUI triggers the LlamaIndex RAG/Routing pipeline rather than just talking to a "blank" LLM. Deployment of Open WebUI is handled by docker-compose.yml.  Open your browser to `http://localhost:80` to query Angol.
 
 ---
 
