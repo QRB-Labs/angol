@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Starting Angol Cycle..."
+echo "Starting Angol orchestrator..."
 
 # Ensure we are in the project root directory
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,7 +27,7 @@ sleep 10 # Allow VRAM to clear completely
 # 2. Start Ingestion LLM (Llama-8B AWQ) for RAPTOR Summarization
 echo "Loading Meta-Llama-3.1-8B-Instruct-AWQ into VRAM via Docker..."
 docker run -d --name vllm-model --gpus all \
-    -e HUGGING_FACE_HUB_TOKEN="${HUGGING_FACE_HUB_TOKEN}" \
+    --env_file "${PROJECT_DIR}/.env" \
     -p 8000:8000 \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --ipc=host \
@@ -51,6 +51,7 @@ sleep 10
 # 5. Start Serving LLM (Qwen-14B-AWQ) for User Queries
 echo "Loading Qwen-2.5-14B-Instruct-AWQ into VRAM via Docker..."
 docker run -d --name vllm-model --gpus all \
+    --env-file "${PROJECT_DIR}/.env" \
     -p 8000:8000 \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --ipc=host \

@@ -12,18 +12,11 @@
 
 **1. Environment**
 
-We use **Ubuntu 22.04 LTS**, which natively provides Python 3.10. More recent versions (e.g. Ubuntu 26.04 with Python 3.14) have compatibility and driver compilation issues with GPU-accelerated libraries (like `faiss-gpu`).
+*  **Ubuntu 22.04 LTS:**
+Operating system which natively provides Python 3.10. More recent versions (e.g. Ubuntu 26.04 with Python 3.14) have compatibility and driver compilation issues with GPU-accelerated libraries (like `faiss-gpu`).
 
-* **Hugging Face model repo access tokens**
-
-Even though we use open-soure, open-weight models, some require accepting access terms via Hugging Face. Get an access token from https://huggingface.co/settings/tokens and set it as an environment variable.
-
-
-```bash
-	export HUGGING_FACE_HUB_TOKEN="your_huggingface_token_here"
-```
-
-Then request access for specific models e.g. for Llama-3.1-8B go to https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct.
+* **Environment variables:**
+See the file [.env](.env). In particular, `HF_TOKEN` is an access token from https://huggingface.co/settings/tokens. Even though we use open-soure, open-weight models, some specific models impose access terms via Hugging Face e.g. for Llama-3.1-8B go to https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct.
 
 *   **NVIDIA Host Drivers & Docker Toolkit (Required for GPU Access):**
 Ensure the host OS can see the GPU and install the toolkit required to pass it into Docker containers.
@@ -45,8 +38,6 @@ sudo apt-get install -y nvidia-container-toolkit
 sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
-
-Set up a clean standard Python virtual environment. Install system dependencies required for document parsing (Docling), and use standard pip for Python packages. 
 
 *   **System Dependencies (Required for Docling):**
 
@@ -75,8 +66,8 @@ Set up a clean standard Python virtual environment. Install system dependencies 
 
 We use vLLM in a separate docker container to serve open-weight models as local, OpenAI-compatible APIs (preventing PyTorch dependency conflicts in our Python environment).
 Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.sh) automatically toggles between the Ingestion LLM (8B) and the Serving LLM (32B) in their own containers.
-*   **Command:** `./orchestrator.sh` 
-*   *Note:* In production, this is designed to be run nightly via a cron job).
+*   **Command:** `./orchestrator.sh`
+*   *Note:* In production, this is designed to be run e.g. nightly or whenever there's new data to ingest.
 
 ---
 ### Phase 2: Ingestion & RAPTOR Pipeline (Background Process)
