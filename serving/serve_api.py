@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.query_engine import RouterQueryEngine
+from llama_index.core.selectors import PydanticSingleSelector
 from serving.router_tools import get_vector_tool, get_sql_tool
 from serving.prompt_templates import CITATION_SYSTEM_PROMPT
 
@@ -20,15 +21,25 @@ load_dotenv()
 
 app = FastAPI()
 
-# Connect to the local vLLM instance (currently running on port 8000)
+# 1. The Standard LLM (Used for the final conversational response to the user)
 local_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
-    api_key=os.getenv("OPENAI_API_KEY"),
+    api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
     model=os.getenv("GENERATION_MODEL"),
     system_prompt=CITATION_SYSTEM_PROMPT,
-    is_chat_model=True,          # <--- TELLS IT TO USE /v1/chat/completions
-    max_tokens=1024,             # <--- PREVENTS THE RESPONSE FROM GETTING CUT OFF
-    context_window=16384         # <--- LETS LLAMA-INDEX KNOW QWEN'S CAPACITY
+    is_chat_model=True,          
+    max_tokens=1024,             
+    context_window=16384         
+)
+
+# 2. The Router LLM (Used ONLY internally to pick the tool, strictly locked to JSON)
+router_llm = OpenAILike(
+    api_base="http://localhost:8000/v1",
+    api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
+    model=os.getenv("GENERATION_MODEL"),
+    is_chat_model=True,
+    max_tokens=512,
+    model_kwargs={"response_format": {"type": "json_object"}} 
 )
 
 # Initialize Tools
@@ -38,7 +49,8 @@ sql_tool = get_sql_tool(local_llm)       # Connects to Postgres
 # The Orchestrator / Routing Agent
 router_engine = RouterQueryEngine.from_defaults(
     query_engine_tools=[vector_tool, sql_tool],
-    llm=local_llm
+    llm=local_llm,
+    selector=PydanticSingleSelector.from_defaults(llm=router_llm)
 )
 
 class ChatRequest(BaseModel):
@@ -50,7 +62,7 @@ async def get_models():
         "object": "list",
         "data": [
             {
-                "id": "angol-orchestrator",  # <--- This is the name Open WebUI will display
+                "id": "angol-orchestrator", 
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "angol"
