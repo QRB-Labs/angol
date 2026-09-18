@@ -16,7 +16,8 @@
 Operating system which natively provides Python 3.10. More recent versions (e.g. Ubuntu 26.04 with Python 3.14) have compatibility and driver compilation issues with GPU-accelerated libraries (like `faiss-gpu`).
 
 * **Environment variables:**
-See the file [.env](.env). In particular, `HF_TOKEN` is an access token from https://huggingface.co/settings/tokens. Even though we use open-soure, open-weight models, some specific models impose access terms via Hugging Face e.g. for Llama-3.1-8B go to https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct.
+See the file [.env](.env).
+	*  `HF_TOKEN` is an access token from https://huggingface.co/settings/tokens. Even though we use open-soure, open-weight models, some specific models impose access terms via Hugging Face. E.g. for Llama-3.1-8B. go to https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct and request access. When it is granted, download will be allowed for your token.
 
 *   **NVIDIA Host Drivers & Docker Toolkit (Required for GPU Access):**
 Ensure the host OS can see the GPU and install the toolkit required to pass it into Docker containers.
@@ -26,12 +27,12 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 	sudo apt-get install -y ubuntu-drivers-common
 	sudo ubuntu-drivers autoinstall
 	sudo reboot
- curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
- curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
- sudo apt-get update
- sudo apt-get install -y nvidia-container-toolkit
- sudo nvidia-ctk runtime configure --runtime=docker
- sudo systemctl restart docker
+ 	curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+ 	curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+ 	sudo apt-get update
+ 	sudo apt-get install -y nvidia-container-toolkit
+ 	sudo nvidia-ctk runtime configure --runtime=docker
+ 	sudo systemctl restart docker
 ```
 
 *   **System Dependencies (Required for Docling):**
