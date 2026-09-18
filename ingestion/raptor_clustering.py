@@ -49,7 +49,7 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
     prompt = (
         "You are an expert enterprise analyst. Synthesize and summarize the following text chunks.\n"
         "Identify the major themes, critical data points, and overarching narratives.\n\n"
-        f"TEXT TO SUMMARIZE:\n{combined_text[:25000]}"
+        f"TEXT TO SUMMARIZE:\n{combined_text[:20000]}"
     )
 
     try:
@@ -57,7 +57,7 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
             model=MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=1000
+            max_tokens=750
         )
         summary_text = response.choices[0].message.content
     except Exception as e:
