@@ -23,7 +23,7 @@ app = FastAPI()
 # Connect to Qwen-32B (currently running on port 8000)
 local_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
-    api_key=os.getenv("LLM_API_KEY"),
+    api_key=os.getenv("OPENAI_API_KEY"),
     model="Qwen/Qwen2.5-14B-Instruct-AWQ",
     system_prompt=CITATION_SYSTEM_PROMPT
 )
@@ -40,6 +40,20 @@ router_engine = RouterQueryEngine.from_defaults(
 
 class ChatRequest(BaseModel):
     messages: list
+
+@app.get("/v1/models")
+async def get_models():
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "angol-orchestrator",  # <--- This is the name Open WebUI will display
+                "object": "model",
+                "created": 1700000000,
+                "owned_by": "angol"
+            }
+        ]
+    }
 
 @app.post("/v1/chat/completions")
 async def chat_endpoint(request: ChatRequest):
