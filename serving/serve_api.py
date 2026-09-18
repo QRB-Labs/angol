@@ -25,7 +25,10 @@ local_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
     api_key=os.getenv("OPENAI_API_KEY"),
     model="Qwen/Qwen2.5-14B-Instruct-AWQ",
-    system_prompt=CITATION_SYSTEM_PROMPT
+    system_prompt=CITATION_SYSTEM_PROMPT,
+    is_chat_model=True,          # <--- TELLS IT TO USE /v1/chat/completions
+    max_tokens=1024,             # <--- PREVENTS THE RESPONSE FROM GETTING CUT OFF
+    context_window=16384         # <--- LETS LLAMA-INDEX KNOW QWEN'S CAPACITY
 )
 
 # Initialize Tools
