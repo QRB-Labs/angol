@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.query_engine import RouterQueryEngine
-from llama_index.core.selectors import PydanticSingleSelector
+from llama_index.core.selectors import LLMSingleSelector
 from serving.router_tools import get_vector_tool, get_sql_tool
 from serving.prompt_templates import CITATION_SYSTEM_PROMPT
 
@@ -50,7 +50,7 @@ sql_tool = get_sql_tool(local_llm)       # Connects to Postgres
 router_engine = RouterQueryEngine.from_defaults(
     query_engine_tools=[vector_tool, sql_tool],
     llm=local_llm,
-    selector=PydanticSingleSelector.from_defaults(llm=router_llm)
+    selector=LLMSingleSelector.from_defaults(llm=router_llm)
 )
 
 class ChatRequest(BaseModel):
