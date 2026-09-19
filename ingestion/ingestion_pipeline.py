@@ -1,5 +1,6 @@
 import os
 import argparse
+import hashlib
 from parser_docling import extract_markdown
 from raptor_clustering import run_faiss_clustering_and_summarize
 from llama_index.vector_stores.qdrant import QdrantVectorStore
@@ -35,6 +36,7 @@ def main(raw_dir):
     unique_buckets = set()
 
     for i, node in enumerate(nodes):
+        node.id_ = hashlib.md5(node.get_content().encode("utf-8")).hexdigest()
         node.metadata["raptor_level"] = 0
         bucket_name = f"bucket_{i // NODES_PER_BUCKET}"
         node.metadata["bucket"] = bucket_name
