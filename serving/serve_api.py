@@ -27,9 +27,11 @@ local_llm = OpenAILike(
     api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
     model=os.getenv("GENERATION_MODEL"),
     system_prompt=CITATION_SYSTEM_PROMPT,
-    is_chat_model=True,          
-    max_tokens=1024,             
-    context_window=16384         
+    is_chat_model=True,
+    # context window + max_tokens should be < --max-model-len in
+    # vllm-model for generation model
+    max_tokens=1024,
+    context_window=15000
 )
 
 # 2. The Router LLM (Used ONLY internally to pick the tool, strictly locked to JSON)
