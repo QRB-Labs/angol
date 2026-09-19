@@ -25,6 +25,7 @@ numpy                                # Standard math arrays (used heavily by FAI
 docling                              # IBM's advanced layout-aware PDF/PPT OCR parser
 pandas                               # For parsing massive CSV/Excel sheets
 openpyxl                             # Required by Pandas to read .xlsx files
+xlrd                                 # Required by Pandas to read legacy .xls files
 
 # ==========================================
 # 5. SQL Agent & Database (PostgreSQL)

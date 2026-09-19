@@ -2,7 +2,10 @@ import os
 import argparse
 import hashlib
 import logging
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 from parser_docling import extract_markdown
+from parser_sql import process_tabular_files
 from raptor_clustering import run_faiss_clustering_and_summarize
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import StorageContext, VectorStoreIndex
@@ -14,6 +17,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main(raw_dir):
+    # Load environment variables for database connections
+    load_dotenv()
+
     # 1. Initialize BGE-M3 Locally
     embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3")
     db_client = qdrant_client.QdrantClient(host="localhost", port=6333)
@@ -38,6 +44,38 @@ def main(raw_dir):
         embed_model=embed_model
     )
 
+    # Both extract_markdown() and process_tabular_files() are
+    # generators yielding one document, so we can process large
+    # batches of docs with only one at a time in memory
+
+    # 4. Process Tabular Data into PostgreSQL
+    logger.info("Initializing PostgreSQL connection...")
+    pg_user = os.getenv("POSTGRES_USER", "postgres")
+    pg_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+    pg_host = os.getenv("POSTGRES_HOST", "localhost")
+    pg_port = os.getenv("POSTGRES_PORT", "5432")
+    pg_db = os.getenv("POSTGRES_DB", "angol_db")
+
+    pg_uri = f"postgresql+psycopg2://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db}"
+    pg_engine = create_engine(pg_uri)
+
+    logger.info("Processing tabular files into PostgreSQL...")
+    for table_name, df_chunk, is_first_chunk in process_tabular_files(raw_dir):
+        if_exists_action = 'replace' if is_first_chunk else 'append'
+        try:
+            df_chunk.to_sql(
+                table_name,
+                pg_engine,
+                if_exists=if_exists_action,
+                index=False,
+                method='multi',
+                chunksize=10000
+            )
+            logger.info(f"Upserted chunk ({len(df_chunk)} rows) to Postgres table '{table_name}'.")
+        except Exception as e:
+            logger.error(f"Failed to insert into Postgres table '{table_name}': {e}")
+
+    # 5. Parse and Process Documents into Qdrant
     # Clustering is done in "buckets" for memory management and semantic groups
     # Assuming an average chunk (node) size of ~2KB (~500 tokens),
     # 500,000 nodes equates to roughly 1GB of raw text per bucket.
@@ -45,8 +83,6 @@ def main(raw_dir):
     unique_buckets = set()
     total_nodes_processed = 0
 
-    # 4. Parse and Process Documents Lazily
-    # Assuming extract_markdown(raw_dir) yields one Document at a time
     for doc in extract_markdown(raw_dir):
         nodes = splitter.get_nodes_from_documents([doc])
 
@@ -66,7 +102,7 @@ def main(raw_dir):
 
     logger.info(f"Pushed {total_nodes_processed} Level 0 nodes to Qdrant.")
 
-    # 5. Run RAPTOR Pipeline (100:1 Compression)
+    # 6. Run RAPTOR Pipeline (100:1 Compression)
     # This function uses FAISS to cluster, then calls the local Llama-8B (Port 8000)
     # to summarize, then embeds the summaries and pushes to Qdrant.
     run_faiss_clustering_and_summarize(
