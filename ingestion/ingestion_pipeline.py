@@ -1,6 +1,7 @@
 import os
 import argparse
 import hashlib
+import logging
 from parser_docling import extract_markdown
 from raptor_clustering import run_faiss_clustering_and_summarize
 from llama_index.vector_stores.qdrant import QdrantVectorStore
@@ -8,6 +9,9 @@ from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import SemanticSplitterNodeParser
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 import qdrant_client
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def main(raw_dir):
     # 1. Initialize BGE-M3 Locally
@@ -56,9 +60,9 @@ def main(raw_dir):
         # Upsert this document's nodes immediately, clearing them from memory
         if nodes:
             index.insert_nodes(nodes)
-            print(f"Upserted {len(nodes)} nodes from {doc.metadata.get('file_name', 'unknown')}.")
+            logger.info(f"Upserted {len(nodes)} nodes from {doc.metadata.get('file_name', 'unknown')}.")
 
-    print(f"Successfully pushed {total_nodes_processed} Level 0 nodes to Qdrant.")
+    logger.info(f"Pushed {total_nodes_processed} Level 0 nodes to Qdrant.")
 
     # 5. Run RAPTOR Pipeline (100:1 Compression)
     # This function uses FAISS to cluster, then calls the local Llama-8B (Port 8000)
