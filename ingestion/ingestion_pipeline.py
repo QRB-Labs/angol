@@ -39,6 +39,8 @@ def main(raw_dir):
     )
 
     # Clustering is done in "buckets" for memory management and semantic groups
+    # Assuming an average chunk (node) size of ~2KB (~500 tokens),
+    # 500,000 nodes equates to roughly 1GB of raw text per bucket.
     NODES_PER_BUCKET = 500000
     unique_buckets = set()
     total_nodes_processed = 0
