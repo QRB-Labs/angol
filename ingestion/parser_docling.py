@@ -1,27 +1,27 @@
 import os
 import logging
 from pathlib import Path
-from typing import List
+from typing import Iterator
 from docling.document_converter import DocumentConverter
 from llama_index.core import Document
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def extract_markdown(raw_dir: str) -> List[Document]:
+def extract_markdown(raw_dir: str) -> Iterator[Document]:
     """
     Scans a directory for supported documents, uses Docling to extract layout-aware markdown,
-    and returns a list of LlamaIndex Document objects with basic metadata.
+    and yields LlamaIndex Document objects with basic metadata one by one.
     """
     converter = DocumentConverter()
-    docs = []
     
     base_path = Path(raw_dir)
     if not base_path.exists():
         logger.warning(f"Directory {raw_dir} does not exist. Please create it and add files.")
-        return docs
+        return
 
     supported_extensions = ('.pdf', '.docx', '.pptx', '.xlsx', '.html', '.md', '.csv')
+    docs_yielded = 0
 
     for root, _, files in os.walk(base_path):
         for file in files:
@@ -47,10 +47,10 @@ def extract_markdown(raw_dir: str) -> List[Document]:
                     },
                     excluded_embed_metadata_keys=["file_path", "source_type", "page"]
                 )
-                docs.append(doc)
+                yield doc
+                docs_yielded += 1
                 
             except Exception as e:
                 logger.error(f"Failed to parse {file_path}: {e}")
                 
-    logger.info(f"Successfully extracted {len(docs)} documents from {raw_dir}")
-    return docs
+    logger.info(f"Successfully extracted {docs_yielded} documents from {raw_dir}")
