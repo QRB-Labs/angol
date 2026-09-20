@@ -1,4 +1,5 @@
 import os
+import shutil
 import argparse
 import hashlib
 import logging
@@ -16,7 +17,7 @@ import qdrant_client
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def main(raw_dir):
+def main(raw_dir, processed_dir):
     # Load environment variables for database connections
     load_dotenv()
 
@@ -48,6 +49,8 @@ def main(raw_dir):
     # generators yielding one document, so we can process large
     # batches of docs with only one at a time in memory
 
+    processed_files = set()
+
     # 4. Process Tabular Data into PostgreSQL
     logger.info("Initializing PostgreSQL connection...")
     pg_user = os.getenv("POSTGRES_USER", "postgres")
@@ -60,7 +63,7 @@ def main(raw_dir):
     pg_engine = create_engine(pg_uri)
 
     logger.info("Processing tabular files into PostgreSQL...")
-    for table_name, df_chunk, is_first_chunk in process_tabular_files(raw_dir):
+    for table_name, df_chunk, is_first_chunk, file_path in process_tabular_files(raw_dir):
         if_exists_action = 'replace' if is_first_chunk else 'append'
         try:
             df_chunk.to_sql(
@@ -72,6 +75,7 @@ def main(raw_dir):
                 chunksize=10000
             )
             logger.info(f"Upserted chunk ({len(df_chunk)} rows) to Postgres table '{table_name}'.")
+            processed_files.add(file_path)
         except Exception as e:
             logger.error(f"Failed to insert into Postgres table '{table_name}': {e}")
 
@@ -100,6 +104,14 @@ def main(raw_dir):
             index.insert_nodes(nodes)
             logger.info(f"Upserted {len(nodes)} nodes from {doc.metadata.get('file_name', 'unknown')}.")
 
+            # Track successfully processed files
+            file_name = doc.metadata.get('file_name')
+            file_path = doc.metadata.get('file_path')
+            if file_path:
+                processed_files.add(file_path)
+            elif file_name:
+                processed_files.add(os.path.join(raw_dir, file_name))
+
     logger.info(f"Pushed {total_nodes_processed} Level 0 nodes to Qdrant.")
 
     # 6. Run RAPTOR Pipeline (100:1 Compression)
@@ -112,6 +124,18 @@ def main(raw_dir):
         collection_name="angol"
     )
 
+    # 7. Move processed files
+    if processed_files:
+        os.makedirs(processed_dir, exist_ok=True)
+        for file_path in processed_files:
+            if os.path.exists(file_path):
+                try:
+                    file_name = os.path.basename(file_path)
+                    shutil.move(file_path, os.path.join(processed_dir, file_name))
+                except Exception as e:
+                    logger.error(f"Failed to move {file_path}: {e}")
+        logger.info(f"Moved {len(processed_files)} processed files to {processed_dir}.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Angol RAPTOR Ingestion Pipeline.")
@@ -121,5 +145,11 @@ if __name__ == "__main__":
         default="../data/raw_documents/",
         help="Path to the directory containing raw documents"
     )
+    parser.add_argument(
+        "--processed-dir",
+        type=str,
+        default="../data/processed_documents/",
+        help="Path to move processed documents"
+    )
     args = parser.parse_args()
-    main(raw_dir=args.raw_dir)
+    main(raw_dir=args.raw_dir, processed_dir=args.processed_dir)

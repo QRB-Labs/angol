@@ -19,10 +19,10 @@ def sanitize_identifier(name: str) -> str:
         name = '_' + name
     return name or "unnamed_column"
 
-def process_tabular_files(raw_dir: str) -> Iterator[Tuple[str, pd.DataFrame, bool]]:
+def process_tabular_files(raw_dir: str) -> Iterator[Tuple[str, pd.DataFrame, bool, str]]:
     """
     Scans the directory for CSV and Excel files, sanitizes their schemas,
-    and yields (table_name, dataframe_chunk, is_first_chunk) as a memory-efficient generator.
+    and yields (table_name, dataframe_chunk, is_first_chunk, file_path) as a memory-efficient generator.
     """
     base_path = Path(raw_dir)
     if not base_path.exists():
@@ -47,12 +47,12 @@ def process_tabular_files(raw_dir: str) -> Iterator[Tuple[str, pd.DataFrame, boo
                     chunk_iter = pd.read_csv(file_path, chunksize=50000)
                     for i, chunk in enumerate(chunk_iter):
                         chunk.columns = [sanitize_identifier(col) for col in chunk.columns]
-                        yield table_name, chunk, (i == 0)
+                        yield table_name, chunk, (i == 0), file_path
                 else:
                     # Excel files are read entirely (pandas doesn't support chunking for Excel natively)
                     df = pd.read_excel(file_path)
                     df.columns = [sanitize_identifier(col) for col in df.columns]
-                    yield table_name, df, True
+                    yield table_name, df, True, file_path
 
             except Exception as e:
                 logger.error(f"Failed to extract tabular file {file_path}: {e}")
