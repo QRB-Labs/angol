@@ -71,10 +71,18 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
 
     return {"text": summary_text, "citations": unique_citations}
 
-def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets=None, collection_name="angol"):
-    if unique_buckets is None:
-        unique_buckets = ["default"]
 
+def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets, collection_name="angol"):
+    """
+    With unique_buckets = ["bucket_0", "bucket_1", ...]
+        - new level 1 nodes created from k-clusters in each level 0 bucket
+        - old level 1 remain
+    With unique_buckets = []
+        - no new level 1
+    In all cases
+        - level 2 nodes deleted and recreated from k-clusters across all level 1 nodes
+        - level 3 nodes deleted and recreated from k-clusters across all level 2 nodes
+    """
     current_level = 0
     max_levels = 3
 
@@ -170,6 +178,18 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets=No
                     new_summary_nodes.append(node)
 
             if new_summary_nodes:
+                if bucket_value == "default":
+                    logger.info(f"Cleaning up old Level {next_level} summaries to prevent duplicates...")
+                    try:
+                        db_client.delete(
+                            collection_name=collection_name,
+                            points_selector=Filter(
+                                must=[FieldCondition(key="raptor_level", match=MatchValue(value=next_level))]
+                            )
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to delete old summaries (might not exist yet): {e}")
+
                 logger.info(f"Pushing {len(new_summary_nodes)} Level {next_level} summaries to Qdrant...")
 
                 vector_store = QdrantVectorStore(client=db_client, collection_name=collection_name)
