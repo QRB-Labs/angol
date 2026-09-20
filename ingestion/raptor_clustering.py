@@ -149,7 +149,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets=No
             next_level = current_level + 1
             new_summary_nodes = []
 
-            logger.info(f"Sending {len(clusters)} clusters to Llama-8B...")
+            logger.info(f"Sending {len(clusters)} clusters to {MODEL_NAME}...")
             with ThreadPoolExecutor(max_workers=10) as executor:
                 future_to_cluster = {
                     executor.submit(summarize_cluster, nodes, next_level): nodes

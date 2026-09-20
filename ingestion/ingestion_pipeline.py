@@ -103,7 +103,7 @@ def main(raw_dir):
     logger.info(f"Pushed {total_nodes_processed} Level 0 nodes to Qdrant.")
 
     # 6. Run RAPTOR Pipeline (100:1 Compression)
-    # This function uses FAISS to cluster, then calls the local Llama-8B (Port 8000)
+    # This function uses FAISS to cluster, then calls the ingestion LLM
     # to summarize, then embeds the summaries and pushes to Qdrant.
     run_faiss_clustering_and_summarize(
         db_client=db_client,
