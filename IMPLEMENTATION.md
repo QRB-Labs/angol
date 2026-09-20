@@ -17,6 +17,7 @@ Operating system which natively provides Python 3.10. More recent versions (e.g.
 
 * **Environment variables:**
 See the file [.env](.env).
+	*  `INGESTION_MODEL` and `GENERATION_MODEL` define the Hugging Face repo IDs for the models used during RAPTOR summarization and chat serving, respectively.
 	*  `HF_TOKEN` is an access token from https://huggingface.co/settings/tokens. Even though we use open-soure, open-weight models, some specific models impose access terms via Hugging Face. E.g. for Llama-3.1-8B. go to https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct and request access. When it is granted, download will be allowed for your token.
 
 *   **NVIDIA Host Drivers & Docker Toolkit (Required for GPU Access):**
@@ -27,12 +28,12 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 	sudo apt-get install -y ubuntu-drivers-common
 	sudo ubuntu-drivers autoinstall
 	sudo reboot
- 	curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
- 	curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
- 	sudo apt-get update
- 	sudo apt-get install -y nvidia-container-toolkit
- 	sudo nvidia-ctk runtime configure --runtime=docker
- 	sudo systemctl restart docker
+	curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+	curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+	sudo apt-get update
+	sudo apt-get install -y nvidia-container-toolkit
+	sudo nvidia-ctk runtime configure --runtime=docker
+	sudo systemctl restart docker
 ```
 
 *   **System Dependencies (Required for Docling):**
@@ -61,14 +62,14 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 **3. Model Serving Engine (vLLM & Orchestrator)**
 
 We use vLLM in a separate docker container to serve open-weight models as local, OpenAI-compatible APIs (preventing PyTorch dependency conflicts in our Python environment).
-Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.sh) automatically toggles between the Ingestion LLM (8B) and the Serving LLM (32B) in their own containers.
+Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.sh) automatically toggles between the Ingestion LLM and the Generation LLM (defined in `.env`) in their own containers.
 *   **Command:** `./orchestrator.sh`
 *   *Note:* In production, this is designed to be run e.g. nightly or whenever there's new data to ingest.
 
 ---
 ### Phase 2: Ingestion & RAPTOR Pipeline (Background Process)
 
-This phase is executed by a heavy Python script run by the orchestrator while the 8B model is loaded in vLLM.
+This phase is executed by a heavy Python script run by the orchestrator while the ingestion model is loaded in vLLM.
 [`ingestion/ingestion_pipeline.py`](ingestion/ingestion_pipeline.py) (the RAPTOR Engine) reads the raw documents, chunks them, and builds the hierarchical tree.
 
 **High-Level Structure:**
@@ -82,17 +83,17 @@ This phase is executed by a heavy Python script run by the orchestrator while th
 	Instead of a flat pass, the pipeline recursively builds a hierarchical semantic tree (up to `max_levels`).
 	* **Loop Levels:** Starting at `raptor_level=0` (leaf nodes), the system fetches vectors bucket-by-bucket to respect the 128GB RAM limit.
 	* **Cluster:** FAISS K-Means groups semantically similar chunks within the current bucket and level.
-	* **Summarize:** Local Llama-3.1-8B (via vLLM) synthesizes each cluster into a single overarching summary node, inheriting deduplicated `child_citations`.
+	* **Summarize:** The ingestion LLM (via vLLM) synthesizes each cluster into a summary node, inheriting deduplicated `child_citations`.
 	* **Re-Embed:** Summaries are embedded (BGE-M3) and upserted to Qdrant tagged as `raptor_level = current_level + 1`.
-	* **Recurse:** The process repeats on the newly generated summary nodes until the tree root is reached or node counts fall below the clustering threshold.    ```
+	* **Recurse:** The process repeats on the newly generated summary nodes until the tree root is reached or node counts fall below the clustering threshold.
 
 ---
 
 ### Phase 3: Retrieval, Reasoning & Serving
 
-Once ingestion is complete, orchestrator shuts down the Llama-8B vLLM instance and starts the Qwen-32B vLLM instance.
+Once ingestion is complete, orchestrator shuts down the ingestion vLLM instance and starts the generation vLLM instance.
 
-To connect Qwen-32B to Open WebUI seamlessly, we need  "middleware", implemented in [`serving/serve_api.py`](serving/serve_api.py). Uses FastAPI to expose LlamaIndex's Router and Qdrant integration as a standard chat endpoint.
+To connect the generation LLM to Open WebUI seamlessly, we need  "middleware", implemented in [`serving/serve_api.py`](serving/serve_api.py). Uses FastAPI to expose LlamaIndex's Router and Qdrant integration as a standard chat endpoint.
 Translates Open WebUI's OpenAI-style requests into LlamaIndex orchestrations, routing between SQL and the RAPTOR Vector DB.
 
 **High-Level Structure:**
@@ -101,7 +102,7 @@ Translates Open WebUI's OpenAI-style requests into LlamaIndex orchestrations, ro
 	*   `vector_tool = QueryEngineTool(engine=qdrant_engine, description="Use for PDFs, text, and concepts.")`
 	*   `sql_tool = QueryEngineTool(engine=nl_sql_engine, description="Use for spreadsheet math and data.")`
 3.  **The Routing Agent:**
-	*   Initialize the `RouterQueryEngine` pointing to the local Qwen-32B vLLM server.
+	*   Initialize the `RouterQueryEngine` pointing to the local generation vLLM server.
 4.  **FastAPI Endpoint (`/v1/chat/completions`):**
 	*   Accept incoming JSON from Open WebUI.
 	*   Pass the user's prompt to the `RouterQueryEngine`.
@@ -109,7 +110,7 @@ Translates Open WebUI's OpenAI-style requests into LlamaIndex orchestrations, ro
 		*   Embeds the query (BGE-M3).
 		*   Searches Qdrant (pulling Level 0 through Level 3 nodes).
 		*   Assembles the citation prompt.
-		*   Streams the reasoning result from Qwen-32B.
+		*   Streams the reasoning result from the generation LLM.
 	*   Return the synthesized, cited string back to the UI.
 	*   *Command:* `uvicorn serve_api:app --host 0.0.0.0 --port 8081`
 
@@ -127,7 +128,7 @@ Open WebUI provide a ChatGPT-like experience for enterprise users. It connects t
 angol/
 ├── docker-compose.yml           # Infrastructure (Qdrant, Postgres, Open WebUI)
 ├── requirements.txt             # Python dependencies
-├── .env                         # Environment variables (ports, DB credentials)
+├── .env                         # Environment variables (ports, DB credentials, model names)
 ├── orchestrator.sh              # Bash script managing the Dual-LLM daily cycle
 │
 ├── data/                        # Local data and mapped Docker volumes
@@ -141,11 +142,11 @@ angol/
 │   ├── ingestion_pipeline.py    # Main entry point for nightly ingestion
 │   ├── parser_docling.py        # PDF/PPT extraction to Markdown
 │   ├── parser_sql.py            # Pandas script for massive spreadsheets -> Postgres
-│   └── raptor_clustering.py     # FAISS K-Means and Llama-8B summarization loop
+│   └── raptor_clustering.py     # FAISS K-Means and ingestion LLM summarization loop
 │
 └── serving/                     # Phase 3 & 4: Retrieval and Generation
 	├── __init__.py
 	├── serve_api.py             # FastAPI Middleware (LlamaIndex Orchestrator)
 	├── router_tools.py          # LlamaIndex tool definitions (Vector Search vs SQL)
-	└── prompt_templates.py      # The strict citation system prompt for Qwen-32B
+	└── prompt_templates.py      # The strict citation system prompt for the generation LLM
 ```
