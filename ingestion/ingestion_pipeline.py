@@ -10,7 +10,7 @@ from parser_sql import process_tabular_files
 from raptor_clustering import run_faiss_clustering_and_summarize
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import StorageContext, VectorStoreIndex
-from llama_index.core.node_parser import SemanticSplitterNodeParser
+from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 import qdrant_client
 
@@ -38,11 +38,10 @@ def main(raw_dir, processed_dir):
         embed_model=embed_model,
     )
 
-    # 3. Setup Chunking
-    splitter = SemanticSplitterNodeParser(
-        buffer_size=1,
-        breakpoint_percentile_threshold=95,
-        embed_model=embed_model
+    # 3. Setup Chunking, chunk size ~500 tokens
+    splitter = SentenceSplitter(
+        chunk_size=500,  
+        chunk_overlap = 50
     )
 
     # Both extract_markdown() and process_tabular_files() are
