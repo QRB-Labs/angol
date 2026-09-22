@@ -15,7 +15,7 @@ from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.query_engine import RouterQueryEngine
 from llama_index.core.selectors import LLMSingleSelector
 from serving.router_tools import get_vector_tool, get_sql_tool
-from serving.prompt_templates import CITATION_SYSTEM_PROMPT
+from serving.prompt_templates import CITATION_SYSTEM_PROMPT, ROUTER_SYSTEM_PROMPT
 
 load_dotenv()
 
@@ -40,8 +40,9 @@ router_llm = OpenAILike(
     api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
     model=os.getenv("GENERATION_MODEL"),
     is_chat_model=True,
+    temperature=0.0,
     max_tokens=512,
-    model_kwargs={"response_format": {"type": "json_object"}} 
+    additional_kwargs={"response_format": {"type": "json_object"}}
 )
 
 # Initialize Tools
@@ -52,7 +53,10 @@ sql_tool = get_sql_tool(local_llm)       # Connects to Postgres
 router_engine = RouterQueryEngine.from_defaults(
     query_engine_tools=[vector_tool, sql_tool],
     llm=local_llm,
-    selector=LLMSingleSelector.from_defaults(llm=router_llm)
+    selector=LLMSingleSelector.from_defaults(
+        llm=router_llm,
+        prompt_template_str=ROUTER_SYSTEM_PROMPT
+    )
 )
 
 class ChatRequest(BaseModel):
