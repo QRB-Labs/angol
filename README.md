@@ -37,7 +37,7 @@ To build a highly secure, locally deployed (air-gapped) Enterprise AI system cap
 The system utilizes an advanced Retrieval-Augmented Generation (RAG) architecture enhanced by the RAPTOR (Recursive Abstractive Processing for Tree-Organized Retrieval) methodology. Rather than relying on simple semantic similarity, the system builds a hierarchical Knowledge Tree. It clusters related document chunks, summarizes them using a local Large Language Model (LLM), and recursively embeds the summaries. This dual-pipeline architecture (Ingestion and Retrieval) runs entirely on open-source and open-weight software optimized for an NVIDIA DGX Spark (128GB RAM limit).
 
 ## Detailed Design
-
+![Angol Architecture](angol-architecture.png)
 ### 1. Ingestion & Parsing Layer
 *   **PDF/PPT Extraction:** Uses IBM's [Docling](https://github.com/DS4SD/docling) or [Unstructured](https://unstructured.io/) to parse complex layouts and slide decks via specialized Vision/OCR models.
 *   **Spreadsheet Parsing:** Small sheets are converted to Markdown tables. Massive datasets bypass the vector space and are ingested into a local PostgreSQL database for Text-to-SQL agentic querying.

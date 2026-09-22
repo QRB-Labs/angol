@@ -1,9 +1,9 @@
 # Hardware Architecture & Requirements
 
-This document outlines the required hardware specifications for deploying the Enterprise Brain. The architecture is explicitly designed to operate within strict memory constraints by sequentially swapping Ingestion (RAPTOR) and Serving models.
+Angol architecture is explicitly designed to operate within strict memory constraints by sequentially swapping Ingestion and Generation models.
 
 ## 1. Test & Prototype Environment (Google Cloud)
-For prototyping and testing with a small to medium dataset, the architecture can run unmodified on a single modern GPU by utilizing the AWQ quantized version of the serving model (`Qwen-2.5-32B-Instruct-AWQ`).
+For prototyping and testing with a small to medium dataset, the architecture can run unmodified on a single modern GPU by utilizing the AWQ quantized version of the generation model (`Qwen-2.5-32B-Instruct-AWQ`).
 
 ### GCP Instance Specifications
 *   **Instance Type:** `g2-standard-12` (Provision as a **Spot Instance** to minimize costs)
@@ -21,7 +21,7 @@ The production system is targeted for enterprise-grade on-premise hardware or de
 
 ### Target Specifications
 *   **Primary Platform:** NVIDIA DGX, DGX Sparx, or equivalent high-density GPU server.
-*   **GPU Configuration:** 80GB+ Total VRAM required for unquantized 16-bit model serving.
+*   **GPU Configuration:** 80GB+ Total VRAM required for unquantized 16-bit generation model.
     *   *Option A (Single massive GPU):* 1x NVIDIA A100 (80GB) or H100.
     *   *Option B (Multi-GPU setup):* 4x NVIDIA L4 (96GB total) or equivalent RTX/A-Series setup (requires vLLM tensor parallelism: `--tensor-parallel-size 4`).
 *   **System RAM:** 128GB (Hard Architectural Limit)
