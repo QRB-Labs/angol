@@ -7,61 +7,58 @@ digraph AngolEnterpriseAI {
     RawDir [label="Raw Directory", shape=folder, style=filled, fillcolor=lightgrey];
 
     subgraph cluster_pipeline {
-        label = "Ingestion";
-        style = dotted;
-        
-        // Data Classification Level
-        {
-            rank=same;
-            // Forcing order: Unstructured (Left) -> Structured (Right)
-            Unstructured [label="Unstructured Data\n(PDF, PPT)"];
-            Structured [label="Structured Data\n(CSV, XLSX)"];
-            Unstructured -> Structured [style=invis];
-        }
+	label = "Ingestion";
+	style = dotted;
 
-        // Parsing Level
-        {
-            rank=same;
-            Docling [label="Docling Parser\n(Markdown Chunking)"];
-            Pandas [label="Pandas Processing\n(SQL Generation)"];
-            Docling -> Pandas [style=invis];
-        }
+	// Data Classification Level
+	{
+	    rank=same;
+	    // Forcing order: Unstructured (Left) -> Structured (Right)
+	    Unstructured [label="Unstructured Data\n(PDF, PPT)"];
+	    Structured [label="Structured Data\n(CSV, XLSX)"];
+	    Unstructured -> Structured [style=invis];
+	}
 
-        // Embed Level (Vertically between Parsing and DBs)
-        {
-            rank=same;
-            // Forcing order: IngestLLM (Far Left) -> EmbedModel (Middle)
-            IngestLLM [label="Ingestion LLM\n(Llama-3.1-8B)", shape=ellipse, style=filled, fillcolor=lightgreen];
-            IngestEmbedModel [label="Embedding Model\n(BGE-M3)", shape=ellipse, style=filled, fillcolor=lightblue];
-            IngestLLM -> IngestEmbedModel [style=invis];
-        }
+	// Parsing Level
+	{
+	    rank=same;
+	    Docling [label="Docling Parser\n(Markdown Chunking)"];
+	    Pandas [label="Pandas Processing\n(SQL Generation)"];
+	    Docling -> Pandas [style=invis];
+	}
 
-        // Storage & Clustering Level
-        {
-            rank=same;
-            // Forcing order: FAISS (Far Left) -> Qdrant (Middle) -> Postgres (Right)
-            FAISS [label="Clustering Algorithm\n(FAISS GPU K-Means)", shape=hexagon, style=filled, fillcolor=lightyellow];
-            Qdrant [label="Qdrant Vector DB\n(mmap / int8)", shape=cylinder];
-            Postgres [label="PostgreSQL DB\n(Tabular Data)", shape=cylinder];
-            FAISS -> Qdrant -> Postgres [style=invis];
-        }
+	// Embed Level (Vertically between Parsing and DBs)
+	{
+	    rank=same;
+	    // Forcing order: IngestLLM (Far Left) -> EmbedModel (Middle)
+	    IngestLLM [label="Ingestion LLM\n(Llama-3.1-8B)", shape=ellipse, style=filled, fillcolor=lightgreen];
+	    IngestEmbedModel [label="Embedding Model\n(BGE-M3)", shape=ellipse, style=filled, fillcolor=lightblue];
+	    IngestLLM -> IngestEmbedModel [style=invis];
+	}
+
+	// Storage & Clustering Level
+	{
+	    rank=same;
+	    // Forcing order: FAISS (Far Left) -> Qdrant (Middle) -> Postgres (Right)
+	    FAISS [label="Clustering Algorithm\n(FAISS GPU K-Means)", shape=hexagon, style=filled, fillcolor=lightyellow];
+	    Qdrant [label="Qdrant Vector DB\n(mmap / int8)", shape=cylinder];
+	    Postgres [label="PostgreSQL DB\n(Tabular Data)", shape=cylinder];
+	    FAISS -> Qdrant -> Postgres [style=invis];
+	}
     }
 
     subgraph cluster_generation {
-        label = "Serving & Generation";
-        style = dotted;
-        
-        ServeEmbedModel [label="Embedding Model\n(BGE-M3)", shape=ellipse, style=filled, fillcolor=lightblue];
-        Router [label="LlamaIndex Router\n(Query Tool Selection)", shape=diamond];
-        
-        // Horizontal Serving Layer
-        {
-            rank=same;
-            FastAPI [label="FastAPI Middleware\n(serve_api.py)"];
-            GenLLM [label="Generation LLM\n(Qwen-2.5-32B)", shape=ellipse, style=filled, fillcolor=lightpink];
-        }
-        
-        UserQuery [label="User Queries\n(Open WebUI)", shape=oval, style=filled, fillcolor=orange];
+	label = "Generation";
+	style = dotted;
+
+	Router [label="LlamaIndex Router\n(Query Tool Selection)", shape=diamond];
+	ServeEmbedModel [label="Embedding Model\n(BGE-M3)", shape=ellipse, style=filled, fillcolor=lightblue];
+
+	// GenLLM ordered before FastAPI so it gets rendered higher up
+	GenLLM [label="Generation LLM\n(Qwen-2.5-32B)", shape=ellipse, style=filled, fillcolor=lightpink];
+	FastAPI [label="FastAPI Middleware\n(serve_api.py)"];
+
+	UserQuery [label="User Queries\n(Open WebUI)", shape=oval, style=filled, fillcolor=orange];
     }
 
 
@@ -83,10 +80,10 @@ digraph AngolEnterpriseAI {
     // 4. The RAPTOR Loop (Far Left Spine)
     // We use dir=back to draw the arrow from Qdrant to FAISS while ensuring FAISS stays left
     FAISS -> Qdrant [dir=back, label="Read nodes for clustering"];
-    
+
     // IngestLLM stays straight above FAISS
     IngestLLM -> FAISS [dir=back, weight=10, label="Pass grouped nodes"];
-    
+
     // Feeds horizontally from IngestLLM (Left) to Embed Model (Middle)
     IngestLLM -> IngestEmbedModel [label="Summarize & re-embed"];
 
@@ -94,18 +91,20 @@ digraph AngolEnterpriseAI {
     // --- SERVING & GENERATION ---
 
     // 5. DBs pass context down to the Router
-    Postgres -> Router [dir=both, label=" SQL Tool & Tabular Data"];
-    Qdrant -> Router [dir=both, weight=10, label=" RAPTOR Search & Top-K Context"];
-    
+    Postgres -> Router [dir=back, label="SQL"];
+    Qdrant -> ServeEmbedModel [dir=back, weight=10, label="Vector search"];
+
     // Router embedding call (separate copy for serving)
-    Router -> ServeEmbedModel [label="Embed user query", style=dashed];
-    
-    // 6. Router to Middleware
-    Router -> FastAPI [dir=both, weight=10, label=" Route Query & Return Context"];
-    
-    // 7. Middleware to Generation LLM (Horizontal)
-    FastAPI -> GenLLM [dir=both, label=" Context Assembly, Prompt & Stream"];
-    
+    ServeEmbedModel -> Router [dir=back];
+
+    // 6. Router to GenLLM
+    Router -> GenLLM [dir=back, weight=10, label="Query\n+\nintention"];
+    Router -> GenLLM [dir=forward, weight=10, label=" Context"];
+
+    // 7. Generation LLM to Middleware (Structuring it GenLLM->FastAPI forces FastAPI below)
+    GenLLM -> FastAPI [dir=back, weight=10, label="Query	"];
+    GenLLM -> FastAPI [dir=forward, weight=10, label="Generated response"];
+
     // 8. Middleware to User (Bottom Vertical Spine)
-    FastAPI -> UserQuery [dir=both, weight=10, label=" Receive Query & Return Final Answer"];
+    FastAPI -> UserQuery [dir=both, weight=10]
 }
