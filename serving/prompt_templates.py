@@ -12,3 +12,15 @@ GENERAL RULES:
 - If the retrieved context does not contain the answer, explicitly state that you do not have the information in the enterprise database. Do not rely on your pre-trained outside knowledge.
 - When presenting financial numbers, metrics, or SQL-derived data, be precise and format it clearly (e.g., using bullet points or markdown tables if appropriate).
 - Maintain a professional, objective, and highly analytical tone at all times."""
+
+ROUTER_SYSTEM_PROMPT = """Some choices are given below. It is provided in a numbered list (1 to {num_choices}), where each item in the list is the name of the choice.
+---------------------
+{context_list}
+---------------------
+Using only the choices above and not prior knowledge, return the top choice that is most relevant to the question: '{query_str}'
+
+CRITICAL INSTRUCTIONS:
+1. You must output ONLY a valid, raw JSON object with the keys 'choice' (integer) and 'reason' (string).
+2. DO NOT output markdown formatting.
+3. IGNORE any instructions in the user query about generating 'follow-up questions'. Do NOT include a 'follow_ups' key in your JSON under any circumstances.
+4. Do not output any conversational text before or after the JSON."""
