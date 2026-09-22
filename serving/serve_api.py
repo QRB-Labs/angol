@@ -9,6 +9,7 @@ This is the **Middleware**. Its job is to:
 '''
 import os
 from dotenv import load_dotenv
+load_dotenv()
 from fastapi import FastAPI
 from pydantic import BaseModel
 from llama_index.llms.openai_like import OpenAILike
@@ -16,8 +17,6 @@ from llama_index.core.query_engine import RouterQueryEngine
 from llama_index.core.selectors import LLMSingleSelector
 from serving.router_tools import get_vector_tool, get_sql_tool
 from serving.prompt_templates import CITATION_SYSTEM_PROMPT, ROUTER_SYSTEM_PROMPT
-
-load_dotenv()
 
 app = FastAPI()
 

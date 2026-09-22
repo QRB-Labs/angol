@@ -18,7 +18,7 @@ Operating system which natively provides Python 3.10. More recent versions (e.g.
 * **Environment variables:**
 See the file [.env](.env).
 	*  `INGESTION_MODEL` and `GENERATION_MODEL` define the Hugging Face repo IDs for the models used during RAPTOR summarization and chat serving, respectively.
-	*  `HF_TOKEN` is an access token from https://huggingface.co/settings/tokens. Even though we use open-soure, open-weight models, some specific models impose access terms via Hugging Face. E.g. for Llama-3.1-8B. go to https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct and request access. When it is granted, download will be allowed for your token.
+	*  `HF_TOKEN` is an access token from https://huggingface.co/settings/tokens. Even though we use open-soure, open-weight models, in some cases they offer higher speed download (BGE-M3) or impose access terms (Llama-3.1-8B) via the Hugging Face token.
 
 *   **NVIDIA Host Drivers & Docker Toolkit (Required for GPU Access):**
 Ensure the host OS can see the GPU and install the toolkit required to pass it into Docker containers.

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import logging
 from dotenv import load_dotenv
+load_dotenv()  # before other imports in case they depend on env e.g. HF_TOKEN
 from sqlalchemy import create_engine
 from parser_docling import extract_markdown
 from parser_sql import process_tabular_files
@@ -18,11 +19,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main(raw_dir, processed_dir):
-    # Load environment variables for database connections
-    load_dotenv()
 
     # 1. Initialize BGE-M3 Locally
-    embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3")
+    embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", token=os.getenv("HF_TOKEN"))
     db_client = qdrant_client.QdrantClient(host="localhost", port=6333)
 
     # 2. Configure LlamaIndex to talk to Qdrant

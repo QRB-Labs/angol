@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+load_dotenv()
 import qdrant_client
 from sqlalchemy import create_engine
 from llama_index.core import SQLDatabase
@@ -9,7 +10,6 @@ from llama_index.core import VectorStoreIndex
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
-load_dotenv()
 
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
@@ -25,7 +25,7 @@ def get_vector_tool(llm):
     client = qdrant_client.QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
     vector_store = QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION)
     
-    embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3")
+    embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", token=os.getenv("HF_TOKEN"))
     
     index = VectorStoreIndex.from_vector_store(
         vector_store=vector_store,
