@@ -34,7 +34,7 @@ def get_vector_tool(llm):
     
     query_engine = index.as_query_engine(
         llm=llm,
-        similarity_top_k=10
+        similarity_top_k=20
     )
     
     return QueryEngineTool(
