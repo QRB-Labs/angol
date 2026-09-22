@@ -31,8 +31,8 @@ digraph AngolEnterpriseAI {
 	{
 	    rank=same;
 	    // Forcing order: IngestLLM (Far Left) -> EmbedModel (Middle)
-	    IngestLLM [label="Ingestion LLM\n(Llama-3.1-8B)", shape=ellipse, style=filled, fillcolor=lightgreen];
-	    IngestEmbedModel [label="Embedding Model\n(BGE-M3)", shape=ellipse, style=filled, fillcolor=lightblue];
+	    IngestLLM [label="Ingestion LLM", shape=ellipse, style=filled, fillcolor=lightgreen];
+	    IngestEmbedModel [label="Embedding Model", shape=ellipse, style=filled, fillcolor=lightblue];
 	    IngestLLM -> IngestEmbedModel [style=invis];
 	}
 
@@ -51,12 +51,16 @@ digraph AngolEnterpriseAI {
 	label = "Generation";
 	style = dotted;
 
-	Router [label="LlamaIndex Router\n(Query Tool Selection)", shape=diamond];
-	ServeEmbedModel [label="Embedding Model\n(BGE-M3)", shape=ellipse, style=filled, fillcolor=lightblue];
+	Router [label="LlamaIndex Routing Agent", shape=diamond];
+	ServeEmbedModel [label="Embedding Model", shape=ellipse, style=filled, fillcolor=lightblue];
 
-	// GenLLM ordered before FastAPI so it gets rendered higher up
-	GenLLM [label="Generation LLM\n(Qwen-2.5-32B)", shape=ellipse, style=filled, fillcolor=lightpink];
-	FastAPI [label="FastAPI Middleware\n(serve_api.py)"];
+	{
+	   rank=same;
+	   // GenLLM ordered before FastAPI so it gets rendered higher up
+	   RouterLLM [label="Router LLM", shape=ellipse, style=filled, fillcolor=lightpink];
+	    GenLLM [label="Generation LLM", shape=ellipse, style=filled, fillcolor=lightpink];
+	 }
+	FastAPI [label="FastAPI Middleware"];
 
 	UserQuery [label="User Queries\n(Open WebUI)", shape=oval, style=filled, fillcolor=orange];
     }
@@ -70,22 +74,22 @@ digraph AngolEnterpriseAI {
 
     // 2. The Structured Path (Right Side Vertical Spine)
     Structured -> Pandas [weight=10];
-    Pandas -> Postgres [weight=10, label="Store structured tables"];
+    Pandas -> Postgres [weight=10, label="structured tables"];
 
     // 3. The Unstructured Path (Middle Strict Vertical Spine)
     Unstructured -> Docling [weight=10];
-    Docling -> IngestEmbedModel [weight=10, label="Send raw chunks"];
-    IngestEmbedModel -> Qdrant [weight=10, label="Store embedded nodes"];
+    Docling -> IngestEmbedModel [weight=10, label="raw chunks"];
+    IngestEmbedModel -> Qdrant [weight=10, label="nodes"];
 
     // 4. The RAPTOR Loop (Far Left Spine)
     // We use dir=back to draw the arrow from Qdrant to FAISS while ensuring FAISS stays left
-    FAISS -> Qdrant [dir=back, label="Read nodes for clustering"];
+    FAISS -> Qdrant [dir=back, label="nodes for clustering"];
 
     // IngestLLM stays straight above FAISS
-    IngestLLM -> FAISS [dir=back, weight=10, label="Pass grouped nodes"];
+    IngestLLM -> FAISS [dir=back, weight=10, label="clusters of nodes"];
 
     // Feeds horizontally from IngestLLM (Left) to Embed Model (Middle)
-    IngestLLM -> IngestEmbedModel [label="Summarize & re-embed"];
+    IngestLLM -> IngestEmbedModel [label="summary of cluster"];
 
 
     // --- SERVING & GENERATION ---
@@ -98,11 +102,11 @@ digraph AngolEnterpriseAI {
     ServeEmbedModel -> Router [dir=back];
 
     // 6. Router to GenLLM
-    Router -> GenLLM [dir=back, weight=10, label="Query\n+\nintention"];
-    Router -> GenLLM [dir=forward, weight=10, label=" Context"];
+    Router -> RouterLLM [dir=back, weight=10, label="Query\n+\nintention"];
+    Router -> GenLLM [dir=forward, weight=10, label="Context\nw/\ndocs"];
 
     // 7. Generation LLM to Middleware (Structuring it GenLLM->FastAPI forces FastAPI below)
-    GenLLM -> FastAPI [dir=back, weight=10, label="Query	"];
+    RouterLLM -> FastAPI [dir=back, weight=10, label="Query	"];
     GenLLM -> FastAPI [dir=forward, weight=10, label="Generated response"];
 
     // 8. Middleware to User (Bottom Vertical Spine)

@@ -44,7 +44,7 @@ The system utilizes an advanced Retrieval-Augmented Generation (RAG) architectur
 *   **Metadata Tagging:** Every chunk is aggressively tagged with metadata (Author, Date, Department, Page Number, Document ID) to enable accurate citation generation down the pipeline.
 
 ### 2. Chunking & Embedding Layer
-*   **Orchestration:** [LlamaIndex](https://www.llamaindex.ai/) manages chunking and RAG pipelines.
+*   **Pipeline Management:** [LlamaIndex](https://www.llamaindex.ai/) manages chunking and RAG pipelines.
 *   **Chunking Strategy:** Semantic chunking targeting ~1KB of text (roughly 200 tokens) per chunk.
 *   **Embedding Model:** [BAAI BGE-M3](https://huggingface.co/BAAI/bge-m3). Handles massive context windows, supports multi-linguality, and generates dense vectors at 1024 dimensions.
 
@@ -62,27 +62,25 @@ To enable holistic reasoning across the corpus, data is grouped and summarized h
 ### 5. Retrieval & Generation Layer
 *   **Model Serving:** [vLLM](https://github.com/vllm-project/vllm) for high-throughput, memory-efficient LLM serving.
 *   **Reasoning Engine:** [Qwen-2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) or [Meta Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct). Selected for high reasoning capabilities within constrained VRAM.
- *   **Routing Agent:** Managed by LlamaIndex (e.g., via a `RouterQueryEngine`). Rather than requiring a separate model, the orchestrator dynamically prompts the primary Reasoning Engine (e.g., Qwen-2.5-32B) to act as a decision-maker. Before executing a search, the LLM is prompted to classify the user's intent, dynamically routing the query to either the Vector Database (for text/conceptual questions) or to a Text-to-SQL Agent (for massive spreadsheet math and structured data).
+*   **Routing Agent:** Managed by LlamaIndex (e.g., via a `RouterQueryEngine`). The Routing Agent  prompts the Routing LLM to act as a decision-maker, to classify the user's intent, and route the query to either the Vector Database (for text/conceptual questions) or to a Text-to-SQL Agent (for massive spreadsheet math and structured data).
 
-**LlamaIndex** acts as the Orchestrator. It acts as the bridge between the user, the Vector DB (Qdrant), and the LLM via a 4-step programmatic workflow:
+**LlamaIndex** acts as the Routing Agent. It acts as the bridge between the user, the Vector DB (Qdrant), and the LLM via a 4-step programmatic workflow:
 
 #### Step 1: Query Vectorization (The translation)
 When a user submits a prompt (e.g., *"Summarize the supply chain risks in Europe for 2023"*):
-1. **Routing:** The Orchestrator determines this is a text-based query, not a math/spreadsheet query.
-2. **Embedding:** The Orchestrator sends the user's raw text prompt to the **BGE-M3** embedding model. 
+1. **Routing:** The Routing Agent determines this is a text-based query, not a math/spreadsheet query.
+2. **Embedding:** The Routing Agent sends the user's raw text prompt to the **BGE-M3** embedding model.
 3. BGE-M3 translates the user's English prompt into a single 1024-dimensional query vector.
 
 #### Step 2: The RAPTOR Database Search (Fetching Context)
-The Orchestrator sends this single query vector to **Qdrant**. 
+The Routing Agent sends this single query vector to **Qdrant**.
 1. **Hybrid Search:** Qdrant performs a hybrid search against the 40 Million vectors in RAM. It looks for both mathematical proximity (HNSW Vector Search) and exact keyword matches (Sparse/BM25 Search).
 2. **Tree Collapse Search:** Because of the RAPTOR architecture, Qdrant searches the *entire* hierarchy simultaneously, from **Level 0 Leaf Nodes** (raw document chunks) to **Level 1, 2 or 3 Summary Nodes** (synthesized overviews).
-3. Qdrant returns the Top 20 results to the Orchestrator. These results are returned as JSON objects containing the **Original Text Payload** and the **Metadata Array** (citations, page numbers, source docs).
+3. Qdrant returns the Top 20 results to the Routing Agent. These results are returned as JSON objects containing the **Original Text Payload** and the **Metadata Array** (citations, page numbers, source docs).
 
 #### Step 3: Context Assembly (The Handoff to Reasoning / Generation LLM)
 
-The Orchestrator takes the Top 20 text payloads retrieved from Qdrant and injects them into a strict **System Prompt Template**  in the Reasomning LLM (Qwen)'s context window.
-
-The payload sent to Qwen via **vLLM** looks exactly like this:
+The Routing Agent takes the Top 20 text payloads retrieved from Qdrant and injects them into a strict **System Prompt Template** in the Generation LLM's context window, via **vLLM** as follows:
 
 ```text
 <|im_start|>system
@@ -105,11 +103,11 @@ Summarize the supply chain risks in Europe for 2023.
 ```
 
 #### Step 4: Generation and Citation
-1. **Inference:** **Qwen-2.5-32B** reads the fully assembled prompt. Because it is an Instruction-Tuned model (`-Instruct`), it strictly obeys the system prompt.
+1. **Inference:** The Generation LLM reads the fully assembled prompt. Because it is an Instruction-Tuned model (`-Instruct`), it strictly obeys the system prompt.
 2. **Synthesis:** It evaluates the competing facts in the provided context (understanding that Level 2 nodes are high-level summaries and Level 0 nodes are granular facts).
 3. **Output:** It streams the final text back to the User Interface, explicitly injecting the citations provided by Qdrant's metadata (e.g., *"Supply chain risks increased by 14% [Report_2023.pdf, Page 42], however, automation offset these delays [Multi-Doc Summary Node]."*). 
 
-**Summary of the Interaction:** The Vector Database acts purely as an ultra-fast semantic filter. The LLM acts purely as a reasoning and reading engine. The Orchestrator (LlamaIndex) facilitates the handoff by wrapping the database's text results into a prompt that the LLM can read.
+**Summary of the Interaction:** The Vector Database acts purely as an ultra-fast semantic filter. The Generation LLM acts purely as a reasoning and reading engine. The Routing Agent (LlamaIndex) facilitates the handoff by wrapping the database's text results into a prompt that the LLM can read.
 
 
 ### 6. User Interface
@@ -146,3 +144,4 @@ Tailored for the hardware constraints of an NVIDIA DGX Spark with 128GB System R
 ## Notes
 *   **Citations:** To guarantee accurate citations, the chunking mechanism *must* append metadata arrays to every RAPTOR summary node. When the LLM references a Level 2 summary, the UI will parse the metadata array to show the user the 10,000 original documents that informed that node.
 *   **Security:** All weights (BGE-M3, Llama/Qwen, OCR models) and software (vLLM, Qdrant) are open-source/open-weight and run entirely locally. The system requires zero external API calls, satisfying strict air-gapped compliance requirements.
+*   **Single LLM Instance Serving:** While the design logically separates the "Routing LLM" and "Generation LLM" based on their distinct tasks, in practical implementation, memory constraints dictate that a single LLM instance (e.g., Qwen-2.5-32B hosted via vLLM) serves both roles sequentially. The Routing Agent achieves this by sending distinct system prompts and adjusting generation parameters.

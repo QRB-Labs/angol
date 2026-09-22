@@ -48,7 +48,7 @@ router_llm = OpenAILike(
 vector_tool = get_vector_tool(local_llm) # Connects to Qdrant
 sql_tool = get_sql_tool(local_llm)       # Connects to Postgres
 
-# The Orchestrator / Routing Agent
+# The Routing Agent
 router_engine = RouterQueryEngine.from_defaults(
     query_engine_tools=[vector_tool, sql_tool],
     llm=local_llm,
@@ -67,7 +67,7 @@ async def get_models():
         "object": "list",
         "data": [
             {
-                "id": "angol-orchestrator", 
+                "id": "angol-routing-agent",
                 "object": "model",
                 "created": 1700000000,
                 "owned_by": "angol"
