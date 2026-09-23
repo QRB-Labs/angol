@@ -9,7 +9,7 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import VectorStoreIndex
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from prompt_templates import VECTOR_TOOL_DESCRIPTION, SQL_TOOL_DESCRIPTION
+from serving.prompt_templates import VECTOR_TOOL_DESCRIPTION, SQL_TOOL_DESCRIPTION
 
 
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
