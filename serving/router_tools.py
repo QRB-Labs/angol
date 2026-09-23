@@ -9,6 +9,7 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import VectorStoreIndex
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from prompt_templates import VECTOR_TOOL_DESCRIPTION, SQL_TOOL_DESCRIPTION
 
 
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
@@ -41,12 +42,7 @@ def get_vector_tool(llm):
         query_engine=query_engine,
         metadata=ToolMetadata(
             name="vector_search",
-            description=(
-                "Useful for answering qualitative questions about enterprise documents, "
-                "reports, HR policies, IT architectures, and historical summaries. "
-                "Uses a RAPTOR hierarchical clustering system to provide both high-level "
-                "summaries and specific document details."
-            ),
+            description=VECTOR_TOOL_DESCRIPTION,
         )
     )
 
@@ -67,10 +63,6 @@ def get_sql_tool(llm):
         query_engine=query_engine,
         metadata=ToolMetadata(
             name="sql_database",
-            description=(
-                "Useful for translating natural language into SQL queries. "
-                "Use this tool when the user asks for exact metrics, calculations, "
-                "financial numbers, or structured tabular data that resides in the PostgreSQL database."
-            ),
+            description=SQL_TOOL_DESCRIPTION,
         )
     )
