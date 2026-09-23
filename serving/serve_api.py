@@ -30,7 +30,7 @@ generation_llm = OpenAILike(
     # context window + max_tokens should be < --max-model-len in
     # vllm-model for generation model
     max_tokens=1024,
-    context_window=15000
+    context_window=10000
 )
 
 # 2. The Router LLM (Used ONLY internally to pick the tool, strictly locked to JSON)
