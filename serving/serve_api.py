@@ -21,7 +21,7 @@ from serving.prompt_templates import CITATION_SYSTEM_PROMPT, ROUTER_SYSTEM_PROMP
 app = FastAPI()
 
 # 1. The Standard LLM (Used for the final conversational response to the user)
-local_llm = OpenAILike(
+generation_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
     api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
     model=os.getenv("GENERATION_MODEL"),
@@ -45,13 +45,13 @@ router_llm = OpenAILike(
 )
 
 # Initialize Tools
-vector_tool = get_vector_tool(local_llm) # Connects to Qdrant
-sql_tool = get_sql_tool(local_llm)       # Connects to Postgres
+vector_tool = get_vector_tool(generation_llm) # Connects to Qdrant
+sql_tool = get_sql_tool(generation_llm)       # Connects to Postgres
 
 # The Routing Agent
-router_engine = RouterQueryEngine.from_defaults(
+routing_agent = RouterQueryEngine.from_defaults(
     query_engine_tools=[vector_tool, sql_tool],
-    llm=local_llm,
+    llm=generation_llm,
     selector=LLMSingleSelector.from_defaults(
         llm=router_llm,
         prompt_template_str=ROUTER_SYSTEM_PROMPT
@@ -80,8 +80,8 @@ async def chat_endpoint(request: ChatRequest):
     # Extract user prompt
     user_query = request.messages[-1]["content"]
     
-    # LlamaIndex routes, searches, and generates using the local model
-    response = router_engine.query(user_query)
+    # LlamaIndex routes, searches, and generates using the router and generation LLMs
+    response = routing_agent.query(user_query)
     
     # Return in standard OpenAI JSON format to Open WebUI
     return {

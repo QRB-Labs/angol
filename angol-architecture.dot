@@ -22,8 +22,8 @@ digraph AngolEnterpriseAI {
 	// Parsing Level
 	{
 	    rank=same;
-	    Docling [label="Docling Parser\n(Markdown Chunking)"];
-	    Pandas [label="Pandas Processing\n(SQL Generation)"];
+	    Docling [label="Docling Parser"];
+	    Pandas [label="Pandas Processing"];
 	    Docling -> Pandas [style=invis];
 	}
 
@@ -40,18 +40,18 @@ digraph AngolEnterpriseAI {
 	{
 	    rank=same;
 	    // Forcing order: FAISS (Far Left) -> Qdrant (Middle) -> Postgres (Right)
-	    FAISS [label="Clustering Algorithm\n(FAISS GPU K-Means)", shape=hexagon, style=filled, fillcolor=lightyellow];
-	    Qdrant [label="Qdrant Vector DB\n(mmap / int8)", shape=cylinder];
-	    Postgres [label="PostgreSQL DB\n(Tabular Data)", shape=cylinder];
+	    FAISS [label="K-Means Clustering", shape=hexagon, style=filled, fillcolor=lightyellow];
+	    Qdrant [label="Qdrant\nVector DB", shape=cylinder];
+	    Postgres [label="PostgreSQL\nTabular DB", shape=cylinder];
 	    FAISS -> Qdrant -> Postgres [style=invis];
 	}
     }
 
     subgraph cluster_generation {
-	label = "Generation";
+	label = "Serving";
 	style = dotted;
 
-	Router [label="LlamaIndex Routing Agent", shape=diamond];
+	Router [label="Routing\nAgent", shape=diamond];
 	ServeEmbedModel [label="Embedding Model", shape=ellipse, style=filled, fillcolor=lightblue];
 
 	{
@@ -61,10 +61,8 @@ digraph AngolEnterpriseAI {
 	    GenLLM [label="Generation LLM", shape=ellipse, style=filled, fillcolor=lightpink];
 	 }
 	FastAPI [label="FastAPI Middleware"];
-
-	UserQuery [label="User Queries\n(Open WebUI)", shape=oval, style=filled, fillcolor=orange];
     }
-
+    UserQuery [label="User Queries\n(Open WebUI)", shape=oval, style=filled, fillcolor=orange];
 
     // --- EDGES & FLOW ---
 
@@ -74,22 +72,22 @@ digraph AngolEnterpriseAI {
 
     // 2. The Structured Path (Right Side Vertical Spine)
     Structured -> Pandas [weight=10];
-    Pandas -> Postgres [weight=10, label="structured tables"];
+    Pandas -> Postgres [weight=10, label="SQL tables"];
 
     // 3. The Unstructured Path (Middle Strict Vertical Spine)
     Unstructured -> Docling [weight=10];
-    Docling -> IngestEmbedModel [weight=10, label="raw chunks"];
+    Docling -> IngestEmbedModel [weight=10, label="chunks"];
     IngestEmbedModel -> Qdrant [weight=10, label="nodes"];
 
     // 4. The RAPTOR Loop (Far Left Spine)
     // We use dir=back to draw the arrow from Qdrant to FAISS while ensuring FAISS stays left
-    FAISS -> Qdrant [dir=back, label="nodes for clustering"];
+    FAISS -> Qdrant [dir=back, label="level n nodes"];
 
     // IngestLLM stays straight above FAISS
     IngestLLM -> FAISS [dir=back, weight=10, label="clusters of nodes"];
 
     // Feeds horizontally from IngestLLM (Left) to Embed Model (Middle)
-    IngestLLM -> IngestEmbedModel [label="summary of cluster"];
+    IngestLLM -> IngestEmbedModel [label="level n+1 summaries"];
 
 
     // --- SERVING & GENERATION ---
@@ -102,8 +100,8 @@ digraph AngolEnterpriseAI {
     ServeEmbedModel -> Router [dir=back];
 
     // 6. Router to GenLLM
-    Router -> RouterLLM [dir=back, weight=10, label="Query\n+\nintention"];
-    Router -> GenLLM [dir=forward, weight=10, label="Context\nw/\ndocs"];
+    Router -> RouterLLM [dir=back, weight=10, label="Translated Query\nw/ Intent"];
+    Router -> GenLLM [dir=forward, weight=10, label="Retrieval-Augmented\nPrompt"];
 
     // 7. Generation LLM to Middleware (Structuring it GenLLM->FastAPI forces FastAPI below)
     RouterLLM -> FastAPI [dir=back, weight=10, label="Query	"];

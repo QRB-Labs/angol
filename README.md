@@ -52,19 +52,19 @@ The system utilizes an advanced Retrieval-Augmented Generation (RAG) architectur
 To enable holistic reasoning across the corpus, data is grouped and summarized hierarchically:
 *   **Metadata Partitioning:** Vectors are first bucketed by metadata (e.g., Department, Year) into batches of 20,000 to 40,000 chunks to prevent memory overflow.
 *   **GPU Clustering:** [NVIDIA FAISS](https://github.com/facebookresearch/faiss) runs GPU-accelerated K-Means clustering on the buckets to group related chunks across different documents (with K=200 to 400 clusters per batch, maintaining a 100:1 compression ratio; lower ratio gains accuracy on small signals but costs more in ingestion time and run-time memory).
-*   **Summarization:** A dedicated Summarization LLM (highly recommended: **Meta Llama-3.1-8B-Instruct** deployed via **vLLM** for maximum batch-processing throughput on English corpora) reads the concatenated text of each cluster and generates a comprehensive summary. This new summary text is then embedded and pushed back into the vector database, explicitly storing the source document citations of all underlying child nodes as metadata to preserve accurate lineage and attribution.
+*   **Summarization:** A dedicated Ingestion LLM (highly recommended: **Meta Llama-3.1-8B-Instruct** deployed via **vLLM** for maximum batch-processing throughput on English corpora) reads the concatenated text of each cluster and generates a comprehensive summary. This new summary text is then embedded and pushed back into the vector database, explicitly storing the source document citations of all underlying child nodes as metadata to preserve accurate lineage and attribution.
 *   **Recursion:** Summaries are clustered and summarized iteratively until a "Root Node" executive summary is reached.
 
 ### 4. Storage Layer
-*   **Database:** [Qdrant](https://qdrant.tech/) or [Milvus](https://milvus.io/), deployed locally via Docker.
-*   **Memory Optimization:** Uses Scalar Quantization (Int8) to compress 32-bit floating-point vectors, coupled with memory-mapped (`mmap`) payload storage to keep raw text on the NVMe SSD and only the HNSW search index in System RAM.
+*   **Database:** [Qdrant](https://qdrant.tech/) or [Milvus](https://milvus.io/) for vector data, and PostgreSQL for tabular data, deployed locally via Docker.
+*   **Memory Optimization:** For vector data, use Scalar Quantization (Int8) to compress 32-bit floating-point vectors, coupled with memory-mapped (`mmap`) payload storage to keep raw text on the NVMe SSD and only the HNSW search index in System RAM.
 
 ### 5. Retrieval & Generation Layer
 *   **Model Serving:** [vLLM](https://github.com/vllm-project/vllm) for high-throughput, memory-efficient LLM serving.
 *   **Reasoning Engine:** [Qwen-2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) or [Meta Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct). Selected for high reasoning capabilities within constrained VRAM.
 *   **Routing Agent:** Managed by LlamaIndex (e.g., via a `RouterQueryEngine`). The Routing Agent  prompts the Routing LLM to act as a decision-maker, to classify the user's intent, and route the query to either the Vector Database (for text/conceptual questions) or to a Text-to-SQL Agent (for massive spreadsheet math and structured data).
 
-**LlamaIndex** acts as the Routing Agent. It acts as the bridge between the user, the Vector DB (Qdrant), and the LLM via a 4-step programmatic workflow:
+**LlamaIndex** acts as the Routing Agent. It acts as the bridge between the user, the Vector DB (Qdrant), and the LLM via a 4-step programmatic workflow. The following are the steps for vector data. Similar but simpler steps are taken for SQL data (see diagram above).
 
 #### Step 1: Query Vectorization (The translation)
 When a user submits a prompt (e.g., *"Summarize the supply chain risks in Europe for 2023"*):
