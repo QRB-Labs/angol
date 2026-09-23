@@ -29,6 +29,7 @@ Runs locally on a NDVIDIA GDX Spark or less.
 - [Hardware](#hardware)
 - [Design Alternatives](#design-alternatives)
 - [Notes](#notes)
+- [Author(s)](#authors)
 
 ## Objective
 To build a highly secure, locally deployed (air-gapped) Enterprise AI system capable of ingesting large volumes of heterogeneous corporate documents (PDFs, PPTs, Spreadsheets). The system will provide accurate, reasoned answers to both granular and global queries, synthesize knowledge across multiple documents, and explicitly cite supporting sources. 
@@ -139,9 +140,14 @@ Tailored for the hardware constraints of an NVIDIA DGX Spark with 128GB System R
 *   **RAPTOR vs. Standard RAG:** Standard RAG is computationally cheaper but fails at global questions (e.g., "Summarize risks across all documents"). RAPTOR incurs high upfront compute costs during ingestion but enables complex cross-document reasoning.
 *   **Text Summarization vs. Vector Averaging:** Taking the mathematical centroid of a vector cluster dilutes facts and prevents the database from returning readable text to the LLM. Using an LLM to summarize the cluster's text *before* re-embedding preserves specific facts and context.
 *   **FAISS vs. UMAP/GMM:** Standard RAPTOR literature uses UMAP for dimensionality reduction followed by Gaussian Mixture Models. On a 128GB system, UMAP will trigger Out-of-Memory (OOM) errors at scale. FAISS K-Means on GPU is heavily optimized for massive batch clustering.
-*   **Single vs. Dual LLM Deployment:** The architecture utilizes two different LLMs. Summarization requires a massive context window (to read hundreds of chunks at once) but relatively low logic (it just needs to condense facts), and high speed since it is part of a large ingestion pipeline, e.g. Meta Llama-3.1-8B. Reasoning requires high logic (to parse complex user intent, evaluate contradictory sources, and format citations) but a smaller context window (only reading the top 20 retrieved chunks), leading to a heavier, instruction-tuned model, e.g Qwen-2.5-32B. Our hardware (128GB of RAM total) can't support both models in memory at the same time, as well as the vector DB etc. So the 8B model is loaded exclusively during ingestion, and the 32B model is loaded at serving time. For simplicity, we could use the smaller 8B model for both but it may not perform well enough at reasoning.
+*   **Multiple LLM Deployment:** The architecture utilizes three different LLMs. The ingestion LLM does summarization which requires a massive context window (to read hundreds of chunks at once) but relatively low logic (it just needs to condense facts), and high speed since it is part of a large ingestion pipeline, e.g. Meta Llama-3.1-8B. The router LLM and generation LLMs both require high logic (to parse complex user intent, evaluate contradictory sources, and format citations) but a smaller context window (only reading the query or the top 20 retrieved chunks), leading to a heavier, instruction-tuned model, e.g Qwen-2.5-32B.  Ideally we would run three different models. But our hardware (128GB of RAM total) can't support more than one at the same time. For simplicity, we could use the smaller 8B model for all three use cases both but it may not perform well enough at reasoning. So the 8B model is loaded during ingestion, and the 32B model is loaded at serving time to serve as both the routing LLM and the generation LLM. The Routing Agent achieves this by sending distinct system prompts and adjusting generation parameters.
+
 
 ## Notes
 *   **Citations:** To guarantee accurate citations, the chunking mechanism *must* append metadata arrays to every RAPTOR summary node. When the LLM references a Level 2 summary, the UI will parse the metadata array to show the user the 10,000 original documents that informed that node.
 *   **Security:** All weights (BGE-M3, Llama/Qwen, OCR models) and software (vLLM, Qdrant) are open-source/open-weight and run entirely locally. The system requires zero external API calls, satisfying strict air-gapped compliance requirements.
-*   **Single LLM Instance Serving:** While the design logically separates the "Routing LLM" and "Generation LLM" based on their distinct tasks, in practical implementation, memory constraints dictate that a single LLM instance (e.g., Qwen-2.5-32B hosted via vLLM) serves both roles sequentially. The Routing Agent achieves this by sending distinct system prompts and adjusting generation parameters.
+
+
+## Author(s)
+
+Nemo Semret with assistance Gemini 3.1 Pro Preview, and reviews from Grok-4.6 Fast, and Claude Sonnet 5 Medium.

@@ -6,7 +6,8 @@
 - [Phase 3: Retrieval, Reasoning & Serving](#phase-3-retrieval-reasoning--serving)
 - [Phase 4: User Interface (Frontend)](#phase-4-user-interface-frontend)
 - [Directory Structure](#directory-structure)
-
+- [Debug tools](#debug-tools)
+- [TODO](#todo)
 ---
 ### Phase 1: Environment Setup & Core Infrastructure
 
@@ -150,3 +151,56 @@ angol/
 	├── router_tools.py          # LlamaIndex tool definitions (Vector Search vs SQL)
 	└── prompt_templates.py      # The strict citation system prompt for the generation LLM
 ```
+
+### Debug tools
+
+
+**1. Get bucket node count **
+
+Qdrant vector db server listens on port 6333. The **Facets API** in Qdrant acts like a `GROUP BY` statement with a `COUNT()` in SQL. Here is an example `curl` command to get the number of nodes at level 0 in each bucket.
+
+```bash
+curl -X POST 'http://localhost:6333/collections/angol/facet' \
+-H 'Content-Type: application/json' \
+-d '{
+  "key": "bucket",
+  "limit": 100,
+  "filter": {
+    "must": [
+      {
+        "key": "raptor_level",
+        "match": {
+          "value": 0
+        }
+      }
+    ]
+  }
+}'
+```
+
+**2. Delete all Level 1 summaries**
+
+This `curl` command uses the **Delete by Filter** endpoint.
+
+```bash
+curl -X POST 'http://localhost:6333/collections/angol/points/delete' \
+-H 'Content-Type: application/json' \
+-d '{
+  "filter": {
+    "must": [
+      {
+        "key": "raptor_level",
+        "match": {
+          "value": 1
+        }
+      }
+    ]
+  }
+}'
+```
+
+### TODO
+
+1. Improve routing prompts.
+1. Instead of using a "one-shot" RouterQueryEngine, upgrade LlamaIndex orchestrator in serve_api.py to a ReAct (Reasoning and Acting) Agent. A ReAct agent works in a loop. If it tries the sql_tool and the database returns an error (e.g., "table not found"), the agent reads that error in its scratchpad, realizes it made a mistake, and autonomously decides to try the vector_tool to get whatever unstructured context it can.
+1. Download script like scp supporting authenticated Microsoft 365 and Google Drive.
