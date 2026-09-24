@@ -16,7 +16,7 @@ from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.query_engine import RouterQueryEngine
 from llama_index.core.selectors import LLMSingleSelector
 from serving.router_tools import get_vector_tool, get_sql_tool
-from serving.prompt_templates import CITATION_SYSTEM_PROMPT, ROUTER_SYSTEM_PROMPT
+from serving.prompt_templates import GENERATION_SYSTEM_PROMPT, ROUTER_SYSTEM_PROMPT
 
 app = FastAPI()
 
@@ -25,7 +25,7 @@ generation_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
     api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
     model=os.getenv("GENERATION_MODEL"),
-    system_prompt=CITATION_SYSTEM_PROMPT,
+    system_prompt=GENERATION_SYSTEM_PROMPT,
     is_chat_model=True,
     # context window + max_tokens should be < --max-model-len in
     # vllm-model for generation model

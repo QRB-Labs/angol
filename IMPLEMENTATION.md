@@ -20,6 +20,7 @@ Operating system which natively provides Python 3.10. More recent versions (e.g.
 See the file [.env](.env).
 	*  `INGESTION_MODEL` and `GENERATION_MODEL` define the Hugging Face repo IDs for the models used during RAPTOR summarization and chat serving, respectively.
 	*  `HF_TOKEN` is an access token from https://huggingface.co/settings/tokens. Even though we use open-soure, open-weight models, in some cases they offer higher speed download (BGE-M3) or impose access terms (Llama-3.1-8B) via the Hugging Face token.
+    *  `OPENAI_API_KEY` is purely a local dummy key required by the client library to talk to the local vLLM server. It is not used for external API calls and can be set to any arbitrary value.
 
 *   **NVIDIA Host Drivers & Docker Toolkit (Required for GPU Access):**
 Ensure the host OS can see the GPU and install the toolkit required to pass it into Docker containers.
@@ -44,7 +45,7 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 	sudo apt-get install tesseract-ocr poppler-utils libgl1 libglib2.0-0
 ```
 
-*   **Python Virtual Environment:**
+*   **Python Virtual Environment:** Load python [requirements.txt](requirements.txt) in a separate python environment to avoid conflict with existing packages.
 
 ```bash
 	sudo apt install python3.10-venv
@@ -155,7 +156,7 @@ angol/
 ### Debug tools
 
 
-**1. Get bucket node count **
+**1. Get bucket node count**
 
 Qdrant vector db server listens on port 6333. The **Facets API** in Qdrant acts like a `GROUP BY` statement with a `COUNT()` in SQL. Here is an example `curl` command to get the number of nodes at level 0 in each bucket.
 
@@ -201,6 +202,5 @@ curl -X POST 'http://localhost:6333/collections/angol/points/delete' \
 
 ### TODO
 
-1. Improve routing prompts.
 1. Instead of using a "one-shot" RouterQueryEngine, upgrade LlamaIndex orchestrator in serve_api.py to a ReAct (Reasoning and Acting) Agent. A ReAct agent works in a loop. If it tries the sql_tool and the database returns an error (e.g., "table not found"), the agent reads that error in its scratchpad, realizes it made a mistake, and autonomously decides to try the vector_tool to get whatever unstructured context it can.
-1. Download script like scp supporting authenticated Microsoft 365 and Google Drive.
+1. Download script like `scp` supporting authenticated Microsoft 365 and Google Drive downloads.

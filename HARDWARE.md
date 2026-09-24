@@ -8,7 +8,7 @@ For prototyping and testing with a small to medium dataset, the architecture can
 ### GCP Instance Specifications
 *   **Instance Type:** `g2-standard-12` (Provision as a **Spot Instance** to minimize costs)
 *   **GPU:** 1x NVIDIA L4 (24GB VRAM)
-    *   *Note:* The 24GB VRAM perfectly fits the ~19GB AWQ model, leaving ~5GB for the vLLM KV cache and context window.
+    *   *Note:* The 24GB VRAM fits the ~19GB AWQ model, leaving ~5GB for the vLLM KV cache and context window.
 *   **vCPUs:** 12 vCPUs
 *   **System RAM:** 48GB 
     *   *Note:* Critical for preventing Out-Of-Memory (OOM) crashes when Docker loads the model weights from disk to RAM before passing them to the GPU.
@@ -17,17 +17,16 @@ For prototyping and testing with a small to medium dataset, the architecture can
 *   **Operating System:** Ubuntu 22.04 LTS (Required for optimal NVIDIA Container Toolkit support)
 
 ## 2. Target Production Environment
-The production system is targeted for enterprise-grade on-premise hardware or dedicated cloud infrastructure. The core architectural constraint driving the orchestrator pipeline is a strict **128GB System RAM limit**.
+The production system is targeted for enterprise-grade on-premise hardware or dedicated cloud infrastructure. The memory requirements support  ~80GB dedicated to LLM inference (model weights + KV cache) and ~48GB for system and database overhead, allowing use unquantized versions of the generation model.
 
 ### Target Specifications
-*   **Primary Platform:** NVIDIA DGX, DGX Sparx, or equivalent high-density GPU server.
-*   **GPU Configuration:** 80GB+ Total VRAM required for unquantized 16-bit generation model.
-    *   *Option A (Single massive GPU):* 1x NVIDIA A100 (80GB) or H100.
-    *   *Option B (Multi-GPU setup):* 4x NVIDIA L4 (96GB total) or equivalent RTX/A-Series setup (requires vLLM tensor parallelism: `--tensor-parallel-size 4`).
-*   **System RAM:** 128GB (Hard Architectural Limit)
+*   **Primary Platform:** NVIDIA DGX Sparx (Unified Architecture) or equivalent high-density GPU server.
+*   **Memory Configuration:** Achieved via one of two deployment paths based on hardware architecture:
+    *   *Path A (Unified Memory - e.g., DGX Sparx / Blackwell):* **128GB Total Shared Memory**. The unified architecture eliminates PCIe bottlenecks. vLLM must be capped to reserve ~80GB for inference, leaving ~48GB for Qdrant, Postgres, OS, and Docling CPU operations.
+    *   *Path B (Discrete / Split Memory - e.g., standard PCIe servers):* **80GB+ GPU VRAM** (e.g., 1x A100/H100 80GB, or 4x L4s via `--tensor-parallel-size 4`) **AND 64GB System RAM** minimum.
 *   **Storage:** 1TB+ NVMe SSD (`pd-ssd` or equivalent physical NVMe)
-    *   *Note:* Extremely fast SSD storage is mandatory. The RAPTOR retrieval pipeline relies on Qdrant configured with `mmap: true`, which treats the physical disk as an extension of RAM for rapid vector similarity searches.
-*   **CPU:** 32+ Cores (Required to prevent thread starvation during heavy, multi-threaded Docling PDF ingestion and OCR).
+    *   *Note:* Extremely fast SSD storage is mandatory. The RAPTOR retrieval pipeline relies on Qdrant configured with `mmap: true`, which treats the physical disk as an extension of RAM for rapid vector similarity searches, relieving pressure on system memory.
+*   **CPU:** 20+ Cores (Required to prevent thread starvation during heavy, multi-threaded Docling PDF ingestion and OCR. Modern high-efficiency cores, such as those paired with Blackwell, easily handle this workload).
 
 ## 3. Local CPU-Only Prototyping (Fallback)
 If a GPU is entirely unavailable, the pipeline logic can be built and tested locally on a standard Mini PC or laptop with the following temporary architectural swaps:
