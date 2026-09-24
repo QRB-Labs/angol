@@ -26,7 +26,6 @@ Runs locally on a NDVIDIA GDX Spark or less.
     - [Step 4: Generation and Citation](#step-4-generation-and-citation)
   - [6. User Interface](#6-user-interface)
 - [Quantitative Estimates](#quantitative-estimates)
-- [Hardware](#hardware)
 - [Design Alternatives](#design-alternatives)
 - [Notes](#notes)
 - [Author(s)](#authors)
@@ -115,7 +114,7 @@ Summarize the supply chain risks in Europe for 2023.
 *   **Frontend:** [Open WebUI](https://github.com/open-webui/open-webui). Provides a ChatGPT-like interface with built-in citation rendering and document snippet viewing.
 
 ## Quantitative Estimates
-Tailored for the hardware constraints of an NVIDIA DGX Spark with 128GB System RAM:
+Tailored for 128GB system RAM (see [hardware requirements](HARDWARE.md)):
 
 *   **Max Safe RAM for Vector DB:** ~80GB (reserving 48GB for OS and FAISS clustering operations).
 *   **Vector Compression:** Int8 Quantization reduces vector size from 4KB to 1KB. HNSW Index adds ~1KB overhead. Total RAM per vector: ~2KB.
@@ -128,12 +127,6 @@ Tailored for the hardware constraints of an NVIDIA DGX Spark with 128GB System R
     *   Level 3 (Summaries): ~40 vectors
     *   Level 4 (Root): 1 vector
 *   **Total Disk Storage Required:** ~100GB of fast NVMe SSD space for the `mmap` payload and database overhead.
-
-## Hardware
-*   **System:** NVIDIA DGX Spark or similar workstation.
-*   **Memory:** 128GB CPU System RAM (Strict bottleneck; requires aggressive memory management).
-*   **Storage:** Fast NVMe Gen4 SSDs for payload memory mapping.
-*   **GPU:** Multi-GPU configuration capable of hosting vLLM (e.g., 2x to 4x RTX class or small A-series GPUs) serving 8B to 32B parameter models.
 
 ## Design Alternatives
 

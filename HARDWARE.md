@@ -1,6 +1,6 @@
 # Hardware Architecture & Requirements
 
-Angol architecture is explicitly designed to operate within strict memory constraints by sequentially swapping Ingestion and Generation models.
+Angol architecture is explicitly designed to operate within strict memory constraints.
 
 ## 1. Test & Prototype Environment (Google Cloud)
 For prototyping and testing with a small to medium dataset, the architecture can run unmodified on a single modern GPU by utilizing the AWQ quantized version of the generation model (`Qwen-2.5-32B-Instruct-AWQ`).
@@ -23,7 +23,7 @@ The production system is targeted for enterprise-grade on-premise hardware or de
 *   **Primary Platform:** NVIDIA DGX Sparx (Unified Architecture) or equivalent high-density GPU server.
 *   **Memory Configuration:** Achieved via one of two deployment paths based on hardware architecture:
     *   *Path A (Unified Memory - e.g., DGX Sparx / Blackwell):* **128GB Total Shared Memory**. The unified architecture eliminates PCIe bottlenecks. vLLM must be capped to reserve ~80GB for inference, leaving ~48GB for Qdrant, Postgres, OS, and Docling CPU operations.
-    *   *Path B (Discrete / Split Memory - e.g., standard PCIe servers):* **80GB+ GPU VRAM** (e.g., 1x A100/H100 80GB, or 4x L4s via `--tensor-parallel-size 4`) **AND 64GB System RAM** minimum.
+    *   *Path B (Discrete / Split Memory - e.g., standard PCIe servers):* **80GB+ GPU VRAM** (e.g., 1x A100/H100 80GB, or 4x L4s via `--tensor-parallel-size 4`) and **64GB System RAM** minimum.
 *   **Storage:** 1TB+ NVMe SSD (`pd-ssd` or equivalent physical NVMe)
     *   *Note:* Extremely fast SSD storage is mandatory. The RAPTOR retrieval pipeline relies on Qdrant configured with `mmap: true`, which treats the physical disk as an extension of RAM for rapid vector similarity searches, relieving pressure on system memory.
 *   **CPU:** 20+ Cores (Required to prevent thread starvation during heavy, multi-threaded Docling PDF ingestion and OCR. Modern high-efficiency cores, such as those paired with Blackwell, easily handle this workload).
