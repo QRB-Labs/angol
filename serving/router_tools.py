@@ -55,7 +55,7 @@ def get_sql_tool(llm):
         sql_database=sql_database,
         llm=llm,
         context_query_kwargs={
-            "context_str": "This database contains highly structured enterprise data, financial records, and metrics."
+            "context_str": "This database contains highly structured tabular data."
         }
     )
     

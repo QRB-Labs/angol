@@ -27,8 +27,8 @@ CRITICAL INSTRUCTIONS:
 
 VECTOR_TOOL_DESCRIPTION = (
     "Useful for answering questions using knowledge from enterprise documents, "
-    "such as reports, papers, books, presentations, design documents, requirements, policies, "
-    "statements, press releases, letters, memos, etc. "
+    "such as articles, reports, papers, books, presentations, manuals, design documents, requirements, policies, "
+    "financial statements, statements, press releases, letters, memos, etc. "
     "Uses a RAPTOR hierarchical clustering system to provide both high-level "
     "summaries and specific document details."
 )
@@ -36,5 +36,5 @@ VECTOR_TOOL_DESCRIPTION = (
 SQL_TOOL_DESCRIPTION = (
     "Useful for translating natural language into SQL queries. "
     "Use this tool when the user asks for or mentions information from tables, spreadsheets, csv or data files "
-    "or otherwise implies looking at structured tabular data that resides in the PostgreSQL database."
+    "or otherwise strongly implies looking at structured tabular data that resides in the PostgreSQL database."
 )
