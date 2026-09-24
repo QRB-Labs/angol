@@ -143,4 +143,4 @@ Tailored for 128GB system RAM (see [hardware requirements](HARDWARE.md)):
 
 ## Author(s)
 
-Nemo Semret with assistance Gemini 3.1 Pro Preview, and reviews from Grok-4.6 Fast, and Claude Sonnet 5 Medium.
+Nemo Semret with Gemini 3.1 Pro Preview, and reviews from Grok-4.6 Fast, and Claude Sonnet 5 Medium.

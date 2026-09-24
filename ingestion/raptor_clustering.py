@@ -75,8 +75,7 @@ def summarize_cluster(cluster_nodes: list, level: int) -> dict:
 def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets, collection_name="angol"):
     """
     With unique_buckets = ["bucket_0", "bucket_1", ...]
-        - new level 1 nodes created from k-clusters in each level 0 bucket
-        - old level 1 remain
+        - level 1 nodes deleted and recreated for each of the given buckets of level 0 nodes
     With unique_buckets = []
         - no new level 1
     In all cases
@@ -91,7 +90,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets, c
         if current_level == 0:
             active_iteration = unique_buckets
         else:
-            active_iteration = ["default"]
+            active_iteration = ["global"]
 
         for bucket_value in active_iteration:
             logger.info(f"Processing Level {current_level} Bucket {bucket_value}")
@@ -100,7 +99,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets, c
             must_conditions = [FieldCondition(key="raptor_level", match=MatchValue(value=current_level))]
 
             # Only apply the bucket filter if not doing a global pass
-            if bucket_value != "default":
+            if bucket_value != "global":
                 must_conditions.append(FieldCondition(key="bucket", match=MatchValue(value=bucket_value)))
 
             level_filter = Filter(must=must_conditions)
@@ -171,24 +170,27 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets, c
                         text=result["text"],
                         metadata={
                             "raptor_level": next_level,
-                            "child_citations": result["citations"]
+                            "child_citations": result["citations"],
+                            "bucket": bucket_value
                         },
                         excluded_embed_metadata_keys=["child_citations"]
                     )
                     new_summary_nodes.append(node)
 
             if new_summary_nodes:
-                if bucket_value == "default":
-                    logger.info(f"Cleaning up old Level {next_level} summaries to prevent duplicates...")
-                    try:
-                        db_client.delete(
-                            collection_name=collection_name,
-                            points_selector=Filter(
-                                must=[FieldCondition(key="raptor_level", match=MatchValue(value=next_level))]
-                            )
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to delete old summaries (might not exist yet): {e}")
+                logger.info(f"Cleaning up old Level {next_level} summaries for '{bucket_value}' to prevent duplicates...")
+                delete_must_conditions = [
+                    FieldCondition(key="raptor_level", match=MatchValue(value=next_level)),
+                    FieldCondition(key="bucket", match=MatchValue(value=bucket_value))
+                ]
+
+                try:
+                    db_client.delete(
+                        collection_name=collection_name,
+                        points_selector=Filter(must=delete_must_conditions)
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to delete old summaries (might not exist yet): {e}")
 
                 logger.info(f"Pushing {len(new_summary_nodes)} Level {next_level} summaries to Qdrant...")
 
