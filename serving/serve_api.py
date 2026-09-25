@@ -13,8 +13,8 @@ load_dotenv()
 from fastapi import FastAPI
 from pydantic import BaseModel
 from llama_index.llms.openai_like import OpenAILike
-from llama_index.core.query_engine import RouterQueryEngine
-from llama_index.core.selectors import LLMSingleSelector
+from llama_index.core.agent import ReActAgent
+from llama_index.core.llms import ChatMessage, MessageRole
 from serving.router_tools import get_vector_tool, get_sql_tool
 from serving.prompt_templates import GENERATION_SYSTEM_PROMPT, ROUTER_SYSTEM_PROMPT
 
@@ -33,15 +33,16 @@ generation_llm = OpenAILike(
     context_window=10000
 )
 
-# 2. The Router LLM (Used ONLY internally to pick the tool, strictly locked to JSON)
+# 2. The Router LLM (Used by the agent for the ReAct reasoning loop)
 router_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
     api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
     model=os.getenv("GENERATION_MODEL"),
+    system_prompt=ROUTER_SYSTEM_PROMPT,
     is_chat_model=True,
     temperature=0.0,
     max_tokens=512,
-    additional_kwargs={"response_format": {"type": "json_object"}}
+    context_window=4096
 )
 
 # Initialize Tools
@@ -49,13 +50,11 @@ vector_tool = get_vector_tool(generation_llm) # Connects to Qdrant
 sql_tool = get_sql_tool(generation_llm)       # Connects to Postgres
 
 # The Routing Agent
-routing_agent = RouterQueryEngine.from_defaults(
-    query_engine_tools=[vector_tool, sql_tool],
-    llm=generation_llm,
-    selector=LLMSingleSelector.from_defaults(
-        llm=router_llm,
-        prompt_template_str=ROUTER_SYSTEM_PROMPT
-    )
+routing_agent = ReActAgent.from_tools(
+    tools=[vector_tool, sql_tool],
+    llm=router_llm,
+    system_prompt=ROUTER_SYSTEM_PROMPT,
+    verbose=True
 )
 
 class ChatRequest(BaseModel):
@@ -80,8 +79,14 @@ async def chat_endpoint(request: ChatRequest):
     # Extract user prompt
     user_query = request.messages[-1]["content"]
     
+    # Convert previous messages to chat history
+    chat_history = []
+    for msg in request.messages[:-1]:
+        role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
+        chat_history.append(ChatMessage(role=role, content=msg.get("content", "")))
+    
     # LlamaIndex routes, searches, and generates using the router and generation LLMs
-    response = routing_agent.query(user_query)
+    response = routing_agent.chat(user_query, chat_history=chat_history)
     
     # Return in standard OpenAI JSON format to Open WebUI
     return {
