@@ -19,6 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main(raw_dir, processed_dir):
+    os.makedirs(processed_dir, exist_ok=True)
 
     # 1. Initialize BGE-M3 Locally
     embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", token=os.getenv("HF_TOKEN"))
@@ -43,12 +44,6 @@ def main(raw_dir, processed_dir):
         chunk_overlap = 50
     )
 
-    # Both extract_markdown() and process_tabular_files() are
-    # generators yielding one document, so we can process large
-    # batches of docs with only one at a time in memory
-
-    processed_files = set()
-
     # 4. Process Tabular Data into PostgreSQL
     logger.info("Initializing PostgreSQL connection...")
     pg_user = os.getenv("POSTGRES_USER", "postgres")
@@ -61,7 +56,18 @@ def main(raw_dir, processed_dir):
     pg_engine = create_engine(pg_uri)
 
     logger.info("Processing tabular files into PostgreSQL...")
+    last_file_path = None
+
     for table_name, df_chunk, is_first_chunk, file_path in process_tabular_files(raw_dir):
+        # If we have moved to a new file, it's safe to move the previous successfully processed file
+        if last_file_path and last_file_path != file_path:
+            if os.path.exists(last_file_path):
+                try:
+                    shutil.move(last_file_path, os.path.join(processed_dir, os.path.basename(last_file_path)))
+                    logger.info(f"Moved processed file {last_file_path}")
+                except Exception as e:
+                    logger.error(f"Failed to move {last_file_path}: {e}")
+
         if_exists_action = 'replace' if is_first_chunk else 'append'
         try:
             df_chunk.to_sql(
@@ -73,9 +79,18 @@ def main(raw_dir, processed_dir):
                 chunksize=10000
             )
             logger.info(f"Upserted chunk ({len(df_chunk)} rows) to Postgres table '{table_name}'.")
-            processed_files.add(file_path)
+            last_file_path = file_path
         except Exception as e:
             logger.error(f"Failed to insert into Postgres table '{table_name}': {e}")
+            last_file_path = None  # Clear tracking on failure so we don't move a failed file
+
+    # Move the very last tabular file
+    if last_file_path and os.path.exists(last_file_path):
+        try:
+            shutil.move(last_file_path, os.path.join(processed_dir, os.path.basename(last_file_path)))
+            logger.info(f"Moved processed file {last_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to move {last_file_path}: {e}")
 
     # 5. Parse and Process Documents into Qdrant
     # Clustering is done in "buckets" for memory management and semantic groups
@@ -102,13 +117,17 @@ def main(raw_dir, processed_dir):
             index.insert_nodes(nodes)
             logger.info(f"Upserted {len(nodes)} nodes from {doc.metadata.get('file_name', 'unknown')}.")
 
-            # Track successfully processed files
+            # Move the processed document immediately
             file_name = doc.metadata.get('file_name')
             file_path = doc.metadata.get('file_path')
-            if file_path:
-                processed_files.add(file_path)
-            elif file_name:
-                processed_files.add(os.path.join(raw_dir, file_name))
+            target_path = file_path if file_path else (os.path.join(raw_dir, file_name) if file_name else None)
+            
+            if target_path and os.path.exists(target_path):
+                try:
+                    shutil.move(target_path, os.path.join(processed_dir, os.path.basename(target_path)))
+                    logger.info(f"Moved processed file {target_path}")
+                except Exception as e:
+                    logger.error(f"Failed to move {target_path}: {e}")
 
     logger.info(f"Pushed {total_nodes_processed} Level 0 nodes to Qdrant.")
 
@@ -121,19 +140,6 @@ def main(raw_dir, processed_dir):
         unique_buckets=list(unique_buckets),
         collection_name="angol"
     )
-
-    # 7. Move processed files
-    if processed_files:
-        os.makedirs(processed_dir, exist_ok=True)
-        for file_path in processed_files:
-            if os.path.exists(file_path):
-                try:
-                    file_name = os.path.basename(file_path)
-                    shutil.move(file_path, os.path.join(processed_dir, file_name))
-                except Exception as e:
-                    logger.error(f"Failed to move {file_path}: {e}")
-        logger.info(f"Moved {len(processed_files)} processed files to {processed_dir}.")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Angol RAPTOR Ingestion Pipeline.")
