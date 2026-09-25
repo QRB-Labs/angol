@@ -10,6 +10,8 @@ from llama_index.core import VectorStoreIndex
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.base.response.schema import Response
+from llama_index.core.query_engine import CustomQueryEngine
+from llama_index.core.base.base_query_engine import BaseQueryEngine
 from serving.prompt_templates import VECTOR_TOOL_DESCRIPTION, SQL_TOOL_DESCRIPTION
 
 
@@ -23,22 +25,23 @@ PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DB = os.getenv("POSTGRES_DB", "angol_db")
 
-class SafeQueryEngineWrapper:
-    def __init__(self, query_engine, fallback_message):
-        self._query_engine = query_engine
-        self._fallback_message = fallback_message
 
-    def query(self, str_or_query_bundle):
-        try:
-            return self._query_engine.query(str_or_query_bundle)
-        except Exception as e:
-            return Response(response=f"Tool error: {str(e)}. {self._fallback_message}")
+class SafeQueryEngineWrapper(CustomQueryEngine):
+    query_engine: BaseQueryEngine
+    fallback_message: str
 
-    async def aquery(self, str_or_query_bundle):
+    def custom_query(self, query_str: str):
         try:
-            return await self._query_engine.aquery(str_or_query_bundle)
+            return self.query_engine.query(query_str)
         except Exception as e:
-            return Response(response=f"Tool error: {str(e)}. {self._fallback_message}")
+            return Response(response=f"Tool error: {str(e)}. {self.fallback_message}")
+
+    async def acustom_query(self, query_str: str):
+        try:
+            return await self.query_engine.aquery(query_str)
+        except Exception as e:
+            return Response(response=f"Tool error: {str(e)}. {self.fallback_message}")
+
 
 def get_vector_tool(llm):
     client = qdrant_client.QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
@@ -57,7 +60,7 @@ def get_vector_tool(llm):
     )
     
     safe_query_engine = SafeQueryEngineWrapper(
-        query_engine, 
+        query_engine=query_engine, 
         fallback_message="Vector search failed. Try rewording your query or using a different tool."
     )
     
@@ -68,6 +71,7 @@ def get_vector_tool(llm):
             description=VECTOR_TOOL_DESCRIPTION,
         )
     )
+
 
 def get_sql_tool(llm):
     db_uri = f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}"
@@ -83,8 +87,8 @@ def get_sql_tool(llm):
     )
     
     safe_query_engine = SafeQueryEngineWrapper(
-        query_engine, 
-        fallback_message="SQL query failed. Try a different query, table, query tool."
+        query_engine=query_engine, 
+        fallback_message="SQL query failed. Try a different query, table, or query tool."
     )
     
     return QueryEngineTool(
