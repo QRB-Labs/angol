@@ -62,9 +62,9 @@ To enable holistic reasoning across the corpus, data is grouped and summarized h
 ### 5. Retrieval & Generation Layer
 *   **Model Serving:** [vLLM](https://github.com/vllm-project/vllm) for high-throughput, memory-efficient LLM serving.
 *   **Reasoning Engine:** [Qwen-2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) or [Meta Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct). Selected for high reasoning capabilities within constrained VRAM.
-*   **Routing Agent:** Managed by LlamaIndex (e.g., via a `RouterQueryEngine`). The Routing Agent  prompts the Routing LLM to act as a decision-maker, to classify the user's intent, and route the query to either the Vector Database (for text/conceptual questions) or to a Text-to-SQL Agent (for massive spreadsheet math and structured data).
+*   **Routing Agent:** Managed by LlamaIndex via a **ReAct (Reasoning and Acting) Agent**. Instead of making a single routing guess, the Agent maintains conversation history and operates in a continuous "Thought &rarr; Action &rarr; Observation" loop. It evaluates the user's intent, selects a tool (Vector DB or PostgreSQL), reads the tool's output, and decides if it has enough information to synthesize an answer. If a tool fails (e.g., a SQL table is missing), the Agent intelligently catches the error and reroutes the query to the Vector DB.
 
-**LlamaIndex** acts as the Routing Agent. It acts as the bridge between the user, the Vector DB (Qdrant), and the LLM via a 4-step programmatic workflow. The following are the steps for vector data. Similar but simpler steps are taken for SQL data (see diagram above).
+**LlamaIndex** acts as the Routing Agent, bridging the user, the tools (Qdrant/PostgreSQL), and the LLM. When the Agent decides to use the Vector DB to answer a conceptual question, it executes the following 4-step programmatic workflow:
 
 #### Step 1: Query Vectorization (The translation)
 When a user submits a prompt (e.g., *"Summarize the supply chain risks in Europe for 2023"*):

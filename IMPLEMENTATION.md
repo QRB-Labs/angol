@@ -104,15 +104,15 @@ Translates Open WebUI's OpenAI-style requests into LlamaIndex orchestrations, ro
 	*   `vector_tool = QueryEngineTool(engine=qdrant_engine, description="Use for PDFs, text, and concepts.")`
 	*   `sql_tool = QueryEngineTool(engine=nl_sql_engine, description="Use for spreadsheet math and data.")`
 3.  **The Routing Agent:**
-	*   Initialize the `RouterQueryEngine` pointing to the local generation vLLM server.
+	*   Initialize a `ReActAgent` pointing to a strict `router_llm` (temperature 0.0) alongside wrapped database tools (`SafeQueryEngineWrapper`) to allow graceful rerouting on error.
 4.  **FastAPI Endpoint (`/v1/chat/completions`):**
 	*   Accept incoming JSON from Open WebUI.
-	*   Pass the user's prompt to the `RouterQueryEngine`.
+	*   Extract chat history and pass it with the user's prompt to the `ReActAgent`.
 	*   LlamaIndex automatically:
-		*   Embeds the query (BGE-M3).
-		*   Searches Qdrant (pulling Level 0 through Level 3 nodes).
+		*   Iteratively reasons which tool to use.
+		*   Embeds the query (BGE-M3) and searches Qdrant (pulling Level 0 through Level 3 nodes), or queries PostgreSQL.
 		*   Assembles the citation prompt.
-		*   Streams the reasoning result from the generation LLM.
+		*   Returns the generated result from the `generation_llm`.
 	*   Return the synthesized, cited string back to the UI.
 	*   *Command:* `uvicorn serve_api:app --host 0.0.0.0 --port 8081`
 
@@ -202,5 +202,4 @@ curl -X POST 'http://localhost:6333/collections/angol/points/delete' \
 
 ### TODO
 
-1. Instead of using a "one-shot" RouterQueryEngine, upgrade LlamaIndex orchestrator in serve_api.py to a ReAct (Reasoning and Acting) Agent. A ReAct agent works in a loop. If it tries the sql_tool and the database returns an error (e.g., "table not found"), the agent reads that error in its scratchpad, realizes it made a mistake, and autonomously decides to try the vector_tool to get whatever unstructured context it can.
 1. Download script like `scp` supporting authenticated Microsoft 365 and Google Drive downloads.
