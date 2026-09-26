@@ -70,7 +70,9 @@ routing_agent = ReActAgent(
     system_prompt=REACT_AGENT_SYSTEM_PROMPT,
     tools=[vector_tool, sql_tool],
     llm=router_llm,
-    verbose=True
+    verbose=True,
+    # default max 10 thought-action-observation iterations is too much
+    max_iterations=4
 )
 
 class ChatRequest(BaseModel):
@@ -117,10 +119,22 @@ async def chat_endpoint(request: ChatRequest):
             # 1. Start the workflow (returns a background handler immediately)
             handler = routing_agent.run(user_msg=user_query, chat_history=chat_history)
 
+            last_thought = ""
+
             # 2. Iterate over internal events as they happen
             async for event in handler.stream_events():
                 event_name = type(event).__name__
                 event_str = str(event)
+
+                # --- Catch Structured ThinkingBlocks (for <think> models) ---
+                if event_name == "AgentOutput":
+                    if hasattr(event, "response") and hasattr(event.response, "blocks"):
+                        for block in event.response.blocks:
+                            if getattr(block, "block_type", "") == "thinking":
+                                thought = getattr(block, "content", "").strip()
+                                if thought and thought != last_thought:
+                                    yield make_chunk(f"🧠 *Thinking: {thought}*\n\n")
+                                    last_thought = thought
 
                 if "ToolCall" in event_name or "ToolCall" in event_str:
                     # --- If it's a Tool ACTION ---
