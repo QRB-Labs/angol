@@ -93,7 +93,8 @@ else
 	vllm/vllm-openai:latest \
 	--model ${GENERATION_MODEL} \
 	--max-model-len 16384 \
-	--gpu-memory-utilization 0.90
+	--gpu-memory-utilization 0.80 \
+	$GENERATION_EXTRA_FLAGS
 
     wait_for_vllm
 fi

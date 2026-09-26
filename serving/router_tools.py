@@ -45,7 +45,8 @@ class SafeQueryEngineWrapper(CustomQueryEngine):
 
 def get_vector_tool(llm):
     client = qdrant_client.QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-    vector_store = QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION)
+    aclient = qdrant_client.AsyncQdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    vector_store = QdrantVectorStore(client=client, aclient=aclient, collection_name=QDRANT_COLLECTION)
     
     embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", token=os.getenv("HF_TOKEN"))
     
