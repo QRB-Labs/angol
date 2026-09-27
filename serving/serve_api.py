@@ -71,8 +71,6 @@ routing_agent = ReActAgent(
     tools=[vector_tool, sql_tool],
     llm=router_llm,
     verbose=True,
-    # default max 10 thought-action-observation iterations is too much
-    max_iterations=4
 )
 
 class ChatRequest(BaseModel):
@@ -105,7 +103,10 @@ async def chat_endpoint(request: ChatRequest):
     if not request.stream:
         response = await routing_agent.run(
             user_msg=user_query,
-            chat_history=chat_history
+            chat_history=chat_history,
+            # default max 20 thought-action-observation iterations is too much
+            max_iterations=4,
+            early_stopping_method="generate"
         )
         return {"choices": [{"message": {"role": "assistant", "content": str(response)}}]}
 
@@ -117,7 +118,9 @@ async def chat_endpoint(request: ChatRequest):
 
         try:
             # 1. Start the workflow (returns a background handler immediately)
-            handler = routing_agent.run(user_msg=user_query, chat_history=chat_history)
+            handler = routing_agent.run(user_msg=user_query, chat_history=chat_history,
+                                        # default max 20 thought-action-observation iterations is too much
+                                        max_iterations=4, early_stopping_method="generate")
 
             last_thought = ""
 
