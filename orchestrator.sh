@@ -108,3 +108,4 @@ else
 fi
 
 echo "System ready for daily user queries!"
+wait

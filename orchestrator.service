@@ -1,0 +1,16 @@
+[Unit]
+Description=Angol AI Orchestrator and API
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=YOUR_LINUX_USERNAME
+WorkingDirectory=/path/to/your/project
+ExecStart=/bin/bash /path/to/your/project/orchestrator.sh
+Restart=on-failure
+RestartSec=10
+Environment=PATH=/usr/bin:/usr/local/bin
+
+[Install]
+WantedBy=multi-user.target
