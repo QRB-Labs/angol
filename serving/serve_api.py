@@ -53,7 +53,7 @@ router_llm = OpenAILike(
     is_chat_model=True,
     temperature=0.0,
     max_tokens=1024,
-    context_window=4096
+    context_window=10000
 )
 
 # Initialize Tools

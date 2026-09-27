@@ -57,7 +57,9 @@ def get_vector_tool(llm):
     
     query_engine = index.as_query_engine(
         llm=llm,
-        similarity_top_k=20  # Note: slow on 24GB GPUs (VRAM limits), but fine on 128GB RAM systems.
+        # Note: k=20 is slow on 24GB GPUs (VRAM limits), but fine on 128GB RAM systems.
+        # k * 500 tokens/node should be < context_window = 10,000 given to the llm
+        similarity_top_k=8,
     )
     
     safe_query_engine = SafeQueryEngineWrapper(
