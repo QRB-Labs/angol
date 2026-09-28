@@ -36,16 +36,56 @@ def extract_markdown(raw_dir: str) -> Iterator[Document]:
                 conversion_result = converter.convert(file_path)
                 markdown_content = conversion_result.document.export_to_markdown()
                 
+                raw_metadata = {}
+                docling_meta = getattr(conversion_result.document, "metadata", None)
+                
+                if docling_meta:
+                    if hasattr(docling_meta, "model_dump"):
+                        raw_metadata = docling_meta.model_dump(exclude_none=True)
+                    elif hasattr(docling_meta, "dict"):
+                        raw_metadata = docling_meta.dict(exclude_none=True)
+                    elif isinstance(docling_meta, dict):
+                        raw_metadata = docling_meta.copy()
+                    else:
+                        raw_metadata = vars(docling_meta)
+
+                cleaned_metadata = {}
+                for key, value in raw_metadata.items():
+                    if value is not None:
+                        if isinstance(value, (str, int, float, bool)):
+                            cleaned_metadata[key] = value
+                        else:
+                            cleaned_metadata[key] = str(value)
+
+                if "title" not in cleaned_metadata:
+                    try:
+                        for item, _ in conversion_result.document.iterate_items():
+                            label = getattr(item, "label", None)
+                            label_name = getattr(label, "name", str(label)).upper()
+                            if "TITLE" in label_name:
+                                cleaned_metadata["title"] = getattr(item, "text", "")
+                                break
+                    except Exception as e:
+                        logger.debug(f"Title fallback failed: {e}")
+
+                if "file_name" not in cleaned_metadata and "filename" not in cleaned_metadata:
+                    cleaned_metadata["file_name"] = file
+                if "file_path" not in cleaned_metadata and "filepath" not in cleaned_metadata:
+                    cleaned_metadata["file_path"] = file_path
+                
+                cleaned_metadata["source_type"] = "docling_markdown"
+                if "page" not in cleaned_metadata:
+                    cleaned_metadata["page"] = "Unknown"
+
+                keys_to_exclude_from_embed = [
+                    k for k in cleaned_metadata.keys() if k.lower() not in ["title", "author"]
+                ]
+
                 # Wrap in a LlamaIndex Document
                 doc = Document(
                     text=markdown_content,
-                    metadata={
-                        "file_name": file,
-                        "file_path": file_path,
-                        "source_type": "docling_markdown",
-                        "page": "Unknown" 
-                    },
-                    excluded_embed_metadata_keys=["file_path", "source_type", "page"]
+                    metadata=cleaned_metadata,
+                    excluded_embed_metadata_keys=keys_to_exclude_from_embed
                 )
                 yield doc
                 docs_yielded += 1
