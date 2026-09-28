@@ -142,10 +142,8 @@ async def chat_endpoint(request: ChatRequest):
                 if "ToolCall" in event_name or "ToolCall" in event_str:
                     # --- If it's a Tool ACTION ---
                     if "Result" not in event_name and "Result" not in event_str:
-                        if "sql" in event_str.lower():
-                            yield make_chunk("🔀 *Agent Action: Querying PostgreSQL Database...*\n\n")
-                        else:
-                            yield make_chunk("🔀 *Agent Action: Searching Qdrant Vector Data...*\n\n")
+                        tool_name = getattr(event, "tool_name", "tool")
+                        yield make_chunk(f"🔀 *Agent Action: Using {tool_name}...*\n\n")
 
                     # --- If it's a Tool RESULT ---
                     else:
