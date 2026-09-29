@@ -114,7 +114,7 @@ async def chat_endpoint(request: ChatRequest):
         return f'data: {json.dumps({"choices": [{"delta": {"content": text}}]})}\n\n'
 
     async def event_generator():
-        yield make_chunk("⚙️ *ReAct Agent Analyzing Query...*\n\n")
+        yield make_chunk("⚙️ *Agent working...*\n\n")
 
         try:
             # 1. Start the workflow (returns a background handler immediately)
@@ -130,30 +130,35 @@ async def chat_endpoint(request: ChatRequest):
                 event_str = str(event)
 
                 # --- Catch Structured ThinkingBlocks (for <think> models) ---
-                if event_name == "AgentOutput":
-                    if hasattr(event, "response") and hasattr(event.response, "blocks"):
-                        for block in event.response.blocks:
-                            if getattr(block, "block_type", "") == "thinking":
-                                thought = getattr(block, "content", "").strip()
-                                if thought and thought != last_thought:
-                                    yield make_chunk(f"🧠 *Thinking: {thought}*\n\n")
-                                    last_thought = thought
+                if event_name == "AgentOutput" and hasattr(event, "response") and hasattr(event.response, "blocks"):
+                    for block in event.response.blocks:
+                        if getattr(block, "block_type", "") == "thinking":
+                            thought = getattr(block, "content", "").strip()
+                            if thought and thought != last_thought:
+                                collapsible_thought = (
+                                    "<details>\n"
+                                    "<summary>🧠 Agent thinking...</summary>\n\n"
+                                    f"{thought}\n"
+                                    "</details>\n\n"
+                                )
+                                yield make_chunk(collapsible_thought)
+                                last_thought = thought
+                # --- If it's a Tool ACTION ---
+                elif event_name == "ToolCall":
+                    tool_name = getattr(event, "tool_name", "tool")
+                    yield make_chunk(f"🔀 *Agent action: Using {tool_name}...*\n\n")
 
-                if "ToolCall" in event_name or "ToolCall" in event_str:
-                    # --- If it's a Tool ACTION ---
-                    if "Result" not in event_name and "Result" not in event_str:
-                        tool_name = getattr(event, "tool_name", "tool")
-                        yield make_chunk(f"🔀 *Agent Action: Using {tool_name}...*\n\n")
+                # --- If it's a Tool RESULT ---
+                elif event_name == "ToolCallResult":
+                    # Extract the output payload from the event safely
+                    tool_output = getattr(event, "tool_output", event_str)
+                    # ToolOutput objects usually have a content attribute, otherwise stringify it
+                    result_text = getattr(tool_output, "content", str(tool_output))
 
-                    # --- If it's a Tool RESULT ---
-                    else:
-                        # Extract the output payload from the event safely
-                        tool_output = getattr(event, "tool_output", event_str)
-                        # ToolOutput objects usually have a content attribute, otherwise stringify it
-                        result_text = getattr(tool_output, "content", str(tool_output))
+                    # Yield it wrapped in a Markdown code block so it looks clean in the UI
+                    yield make_chunk(f"**📄 Tool results:**\n```text\n{result_text}\n```\n\n")
 
-                        # Yield it wrapped in a Markdown code block so it looks clean in the UI
-                        yield make_chunk(f"**📄 Database Results:**\n```text\n{result_text}\n```\n\n⚙️ *Agent Synthesizing Answer...*\n\n")
+                # else: other event
 
             # 3. Once the workflow is done, await the final answer
             response = await handler
