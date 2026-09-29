@@ -30,6 +30,9 @@ from serving.prompt_templates import (
     SQL_TOOL_DESCRIPTION
 )
 
+# default max 20 thought-action-observation iterations is too much
+MAX_ITERATIONS = 8
+
 app = FastAPI()
 
 # 1. The Generation LLM
@@ -104,8 +107,7 @@ async def chat_endpoint(request: ChatRequest):
         response = await routing_agent.run(
             user_msg=user_query,
             chat_history=chat_history,
-            # default max 20 thought-action-observation iterations is too much
-            max_iterations=4,
+            max_iterations=MAX_ITERATIONS,
             early_stopping_method="generate"
         )
         return {"choices": [{"message": {"role": "assistant", "content": str(response)}}]}
@@ -119,8 +121,7 @@ async def chat_endpoint(request: ChatRequest):
         try:
             # 1. Start the workflow (returns a background handler immediately)
             handler = routing_agent.run(user_msg=user_query, chat_history=chat_history,
-                                        # default max 20 thought-action-observation iterations is too much
-                                        max_iterations=4, early_stopping_method="generate")
+                                        max_iterations=MAX_ITERATIONS, early_stopping_method="generate")
 
             last_thought = ""
 
