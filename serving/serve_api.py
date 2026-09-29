@@ -114,7 +114,7 @@ async def chat_endpoint(request: ChatRequest):
         return f'data: {json.dumps({"choices": [{"delta": {"content": text}}]})}\n\n'
 
     async def event_generator():
-        yield make_chunk("⚙️ *Agent working...*\n\n")
+        yield make_chunk("⚙️ *Working...*\n\n")
 
         try:
             # 1. Start the workflow (returns a background handler immediately)
@@ -137,7 +137,7 @@ async def chat_endpoint(request: ChatRequest):
                             if thought and thought != last_thought:
                                 collapsible_thought = (
                                     "<details>\n"
-                                    "<summary>🧠 Agent thinking...</summary>\n\n"
+                                    "<summary>🧠 Thinking...</summary>\n\n"
                                     f"{thought}\n"
                                     "</details>\n\n"
                                 )
@@ -146,8 +146,7 @@ async def chat_endpoint(request: ChatRequest):
                 # --- If it's a Tool ACTION ---
                 elif event_name == "ToolCall":
                     tool_name = getattr(event, "tool_name", "tool")
-                    yield make_chunk(f"🔀 *Agent action: Using {tool_name}...*\n\n")
-
+                    yield make_chunk(f"🔀 *Action: using {tool_name}...*\n\n")
                 # --- If it's a Tool RESULT ---
                 elif event_name == "ToolCallResult":
                     # Extract the output payload from the event safely
@@ -155,14 +154,19 @@ async def chat_endpoint(request: ChatRequest):
                     # ToolOutput objects usually have a content attribute, otherwise stringify it
                     result_text = getattr(tool_output, "content", str(tool_output))
 
-                    # Yield it wrapped in a Markdown code block so it looks clean in the UI
-                    yield make_chunk(f"**📄 Tool results:**\n```text\n{result_text}\n```\n\n")
-
+                    # Yield it wrapped in a collapsible details block
+                    collapsible_tool_result = (
+                        "<details>\n"
+                        "<summary>📄 Results</summary>\n\n"
+                        f"```text\n{result_text}\n```\n"
+                        "</details>\n\n"
+                    )
+                    yield make_chunk(collapsible_tool_result)
                 # else: other event
 
             # 3. Once the workflow is done, await the final answer
             response = await handler
-            yield make_chunk(f"**✅ Final Answer:**\n\n{str(response)}")
+            yield make_chunk(f"**✅ Answer:**\n\n{str(response)}")
 
         except Exception as e:
             yield make_chunk(f"\n\n**Error:** {str(e)}")
