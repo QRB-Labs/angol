@@ -59,7 +59,7 @@ def extract_markdown(raw_dir: str) -> Iterator[Document]:
 
                 if "title" not in cleaned_metadata:
                     try:
-                        for item, _ in conversion_result.document.iterate_items():
+                        for item in conversion_result.document.iterate_items():
                             label = getattr(item, "label", None)
                             label_name = getattr(label, "name", str(label)).upper()
                             if "TITLE" in label_name:
@@ -78,14 +78,22 @@ def extract_markdown(raw_dir: str) -> Iterator[Document]:
                     cleaned_metadata["page"] = "Unknown"
 
                 keys_to_exclude_from_embed = [
-                    k for k in cleaned_metadata.keys() if k.lower() not in ["title", "author"]
+                    k for k in cleaned_metadata.keys() if k.lower() not in [
+                        "title", "author", "file_name", "filename"]
+                ]
+
+                keys_to_exclude_from_llm = [
+                    k for k in cleaned_metadata.keys() if k.lower() not in [
+                        "title", "author", "file_name", "filename", "page"
+                    ]
                 ]
 
                 # Wrap in a LlamaIndex Document
                 doc = Document(
                     text=markdown_content,
                     metadata=cleaned_metadata,
-                    excluded_embed_metadata_keys=keys_to_exclude_from_embed
+                    excluded_embed_metadata_keys=keys_to_exclude_from_embed,
+                    excluded_llm_metadata_keys=keys_to_exclude_from_llm
                 )
                 yield doc
                 docs_yielded += 1
