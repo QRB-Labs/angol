@@ -3,6 +3,7 @@ import shutil
 import argparse
 import hashlib
 import logging
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 load_dotenv()  # before other imports in case they depend on env e.g. HF_TOKEN
 from sqlalchemy import create_engine
@@ -26,6 +27,9 @@ NODES_PER_BUCKET = 500000
 
 def main(raw_dir, processed_dir):
     os.makedirs(processed_dir, exist_ok=True)
+    
+    # Generate ISO 8601 timestamp string for this ingestion run
+    ingestion_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # 1. Initialize BGE-M3 Locally
     embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", token=os.getenv("HF_TOKEN"))
@@ -109,6 +113,7 @@ def main(raw_dir, processed_dir):
         for node in nodes:
             node.id_ = hashlib.md5(node.get_content().encode("utf-8")).hexdigest()
             node.metadata["raptor_level"] = 0
+            node.metadata["ingestion_datetime"] = ingestion_datetime
             bucket_name = f"bucket_{total_nodes_processed // NODES_PER_BUCKET}"
             node.metadata["bucket"] = bucket_name
             unique_buckets.add(bucket_name)

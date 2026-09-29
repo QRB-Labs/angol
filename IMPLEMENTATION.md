@@ -56,7 +56,7 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 
 **2. Infrastructure (Docker Compose)**
 
-[`docker-compose.yml`](docker-compose.yml) spins up the three services without overlapping ports:  Qdrant (Vector DB), PostgreSQL (Spreadsheet DB) and Open WebUI.
+[`docker-compose.yml`](docker-compose.yml) spins up the three services that will start on boot:  Qdrant (Vector DB), PostgreSQL (Spreadsheet DB) and Open WebUI. 
 *   **Command:** `docker compose up -d`
 *   *Note on Qdrant Config:* Ensure the Qdrant volume is mapped to a fast NVMe SSD path, and configure the payload storage to `mmap: true` and vectors to `quantization: int8`.
 
@@ -65,9 +65,23 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 
 We use vLLM in a separate docker container to serve open-weight models as local, OpenAI-compatible APIs (preventing PyTorch dependency conflicts in our Python environment).
 Because of the 128GB RAM limit, a shell script [`orchestrator.sh`](orchestrator.sh) automatically toggles between the Ingestion LLM and the Generation LLM (defined in `.env`) in their own containers.
-*   **Command:** `./orchestrator.sh`
-*   *Note:* In production, this is designed to be run e.g. nightly or whenever there's new data to ingest.
 
+You can run this process in two ways:
+
+*   **Manual / Scheduled (Cron):**
+    Run `./orchestrator.sh` directly. In production, this can be scheduled to run e.g. nightly or whenever there's new data to ingest.
+
+*   **Background Service (Systemd):**
+    Use the provided [`orchestrator.service`](orchestrator.service) template to ensure the orchestrator runs continuously and starts automatically on system boot. To deploy it:
+
+        sudo cp orchestrator.service /etc/systemd/system/angol.service
+        sudo chmod 644 /etc/systemd/system/angol.service
+        sudo systemctl daemon-reload
+        sudo systemctl enable angol.service
+        sudo systemctl start angol.service
+
+    *Note:* You can monitor the live logs of the background service at any time using: `sudo journalctl -u angol.service -f`
+	
 ---
 ### Phase 2: Ingestion & RAPTOR Pipeline (Background Process)
 
@@ -203,7 +217,6 @@ curl -X POST 'http://localhost:6333/collections/angol/points/delete' \
 ### TODO
 
 1. Download script like `scp` supporting authenticated Microsoft 365 and Google Drive downloads.
-1. Ingestion pipeline: add ingestion date 
 1. UI: render citations in responses with links (to processed_documents?)
 1. **Image Captioning**: During the Docling parsing script, whenever an image or chart is detected, pass that cropped image to a local Vision-Language Model (VLM) like **Qwen2-VL-7B** or **Llama-3.2-11B-Vision**. You prompt the VLM: *"Describe this chart and its trends in detail."* 
 You then inject that generated paragraph directly into the Markdown document. This guarantees that deep, visual insights are securely captured in your text-based Vector database!
