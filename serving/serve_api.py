@@ -32,7 +32,7 @@ from serving.prompt_templates import (
 
 app = FastAPI()
 
-# 1. The Standard LLM
+# 1. The Generation LLM
 generation_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
     api_key=os.getenv("OPENAI_API_KEY", "fake-key"),

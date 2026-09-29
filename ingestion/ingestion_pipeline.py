@@ -18,6 +18,12 @@ import qdrant_client
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Clustering is done in "buckets" for memory management and semantic groups
+# Assuming an average chunk (node) size of ~2KB (~500 tokens),
+# 500,000 nodes equates to roughly 1GB of raw text per bucket.
+CHUNK_SIZE = 500
+NODES_PER_BUCKET = 500000
+
 def main(raw_dir, processed_dir):
     os.makedirs(processed_dir, exist_ok=True)
 
@@ -40,7 +46,7 @@ def main(raw_dir, processed_dir):
 
     # 3. Setup Chunking, chunk size ~500 tokens
     splitter = SentenceSplitter(
-        chunk_size=500,  
+        chunk_size=CHUNK_SIZE,  
         chunk_overlap = 50
     )
 
@@ -93,10 +99,6 @@ def main(raw_dir, processed_dir):
             logger.error(f"Failed to move {last_file_path}: {e}")
 
     # 5. Parse and Process Documents into Qdrant
-    # Clustering is done in "buckets" for memory management and semantic groups
-    # Assuming an average chunk (node) size of ~2KB (~500 tokens),
-    # 500,000 nodes equates to roughly 1GB of raw text per bucket.
-    NODES_PER_BUCKET = 500000
     unique_buckets = set()
     total_nodes_processed = 0
 

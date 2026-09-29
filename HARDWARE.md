@@ -20,9 +20,9 @@ For prototyping and testing with a small to medium dataset, the architecture can
 The production system is targeted for enterprise-grade on-premise hardware or dedicated cloud infrastructure. The memory requirements support  ~80GB dedicated to LLM inference (model weights + KV cache) and ~48GB for system and database overhead, allowing use unquantized versions of the generation model.
 
 ### Target Specifications
-*   **Primary Platform:** NVIDIA DGX Sparx (Unified Architecture) or equivalent high-density GPU server.
+*   **Primary Platform:** NVIDIA DGX Spark (Unified Architecture) or equivalent high-density GPU server.
 *   **Memory Configuration:** Achieved via one of two deployment paths based on hardware architecture:
-    *   *Path A (Unified Memory - e.g., DGX Sparx / Blackwell):* **128GB Total Shared Memory**. The unified architecture eliminates PCIe bottlenecks. vLLM must be capped to reserve ~80GB for inference, leaving ~48GB for Qdrant, Postgres, OS, and Docling CPU operations.
+    *   *Path A (Unified Memory - e.g., DGX Spark / Blackwell):* **128GB Total Shared Memory**. The unified architecture eliminates PCIe bottlenecks. vLLM must be capped to reserve ~80GB for inference, leaving ~48GB for Qdrant, Postgres, OS, and Docling CPU operations.
     *   *Path B (Discrete / Split Memory - e.g., standard PCIe servers):* **80GB+ GPU VRAM** (e.g., 1x A100/H100 80GB, or 4x L4s via `--tensor-parallel-size 4`) and **64GB System RAM** minimum.
 *   **Storage:** 1TB+ NVMe SSD (`pd-ssd` or equivalent physical NVMe)
     *   *Note:* Extremely fast SSD storage is mandatory. The RAPTOR retrieval pipeline relies on Qdrant configured with `mmap: true`, which treats the physical disk as an extension of RAM for rapid vector similarity searches, relieving pressure on system memory.

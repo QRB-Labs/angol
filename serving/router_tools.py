@@ -18,6 +18,7 @@ from serving.prompt_templates import VECTOR_TOOL_DESCRIPTION, SQL_TOOL_DESCRIPTI
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "angol")
+VECTOR_TOP_K = int(os.getenv("VECTOR_TOP_K", 12))
 
 PG_USER = os.getenv("POSTGRES_USER", "postgres")
 PG_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
@@ -57,9 +58,7 @@ def get_vector_tool(llm):
     
     query_engine = index.as_query_engine(
         llm=llm,
-        # k=20 is slow with24GB but should be fine with 128GB RAM
-        # k * 500 tokens/node should be < context_window = 10,000 given to the LLM
-        similarity_top_k=12,
+        similarity_top_k=VECTOR_TOP_K,
     )
     
     safe_query_engine = SafeQueryEngineWrapper(

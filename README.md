@@ -45,7 +45,7 @@ The system utilizes an advanced Retrieval-Augmented Generation (RAG) architectur
 
 ### 2. Chunking & Embedding Layer
 *   **Pipeline Management:** [LlamaIndex](https://www.llamaindex.ai/) manages chunking and RAG pipelines.
-*   **Chunking Strategy:** Semantic chunking targeting ~1KB of text (roughly 200 tokens) per chunk.
+*   **Chunking Strategy:** Semantic chunking targeting ~2KB of text (roughly 500 tokens) per chunk.
 *   **Embedding Model:** [BAAI BGE-M3](https://huggingface.co/BAAI/bge-m3). Handles massive context windows, supports multi-linguality, and generates dense vectors at 1024 dimensions.
 
 ### 3. Clustering & Summarization (RAPTOR Pipeline)
