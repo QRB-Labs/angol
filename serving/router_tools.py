@@ -58,7 +58,7 @@ def get_vector_tool(llm):
     
     query_engine = index.as_query_engine(
         llm=llm,
-        similarity_top_k=VECTOR_TOP_K,
+        similarity_top_k=VECTOR_TOP_K
     )
     
     safe_query_engine = SafeQueryEngineWrapper(
