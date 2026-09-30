@@ -138,7 +138,7 @@ async def chat_endpoint(request: ChatRequest):
                             if thought and thought != last_thought:
                                 collapsible_thought = (
                                     "<details>\n"
-                                    "<summary>🧠 Thinking...</summary>\n\n"
+                                    "<summary>🧠 Thought...</summary>\n\n"
                                     f"{thought}\n"
                                     "</details>\n\n"
                                 )
@@ -147,7 +147,13 @@ async def chat_endpoint(request: ChatRequest):
                 # --- If it's a Tool ACTION ---
                 elif event_name == "ToolCall":
                     tool_name = getattr(event, "tool_name", "tool")
-                    yield make_chunk(f"🔀 *Action: using {tool_name}...*\n\n")
+                    tool_kwargs = getattr(event, "tool_kwargs", {})
+                    kwargs_str = json.dumps(tool_kwargs, ensure_ascii=False) if tool_kwargs else "()"
+                    collapsible_action = ( "<details>\n"
+                                           f"<summary>🔀 Action: {tool_name}</summary>\n\n"
+                                           f"`{kwargs_str}`\n"
+                                           "</details>\n\n")
+                    yield make_chunk(collapsible_action)
                 # --- If it's a Tool RESULT ---
                 elif event_name == "ToolCallResult":
                     # Extract the output payload from the event safely
