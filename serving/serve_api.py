@@ -32,6 +32,7 @@ from serving.prompt_templates import (
 
 # default max 20 thought-action-observation iterations is too much
 MAX_ITERATIONS = 8
+GENERATION_MODEL_MAX_LEN = int(os.getenv("GENERATION_MODEL_MAX_LEN", "16384"))
 
 app = FastAPI()
 
@@ -45,7 +46,7 @@ generation_llm = OpenAILike(
     # context_window + max_tokens should be < --max-model-len in
     # vllm-model for generation model
     max_tokens=1024,
-    context_window=10000
+    context_window=15000
 )
 
 # 2. The Router LLM
@@ -56,7 +57,7 @@ router_llm = OpenAILike(
     is_chat_model=True,
     temperature=0.0,
     max_tokens=1024,
-    context_window=10000
+    context_window=15000
 )
 
 # Initialize Tools
@@ -163,13 +164,21 @@ async def chat_endpoint(request: ChatRequest):
 
                     if raw_output and hasattr(raw_output, "source_nodes"):
                         nodes = raw_output.source_nodes
-                        if nodes and len(nodes) > 1:
+                        if nodes:
                             snippet_html = f"<details>\n<summary>🔍 {len(nodes)} nodes retrieved</summary>\n\n"
+                            nodes_size = 0
                             for i, node in enumerate(nodes):
                                 text = node.get_content() if hasattr(node, "get_content") else getattr(node, "text", "")
+                                nodes_size += len(text)
                                 clean_text = text.replace('\n', ' ').strip()
                                 snippet = clean_text[:80] + ("..." if len(clean_text) > 80 else "")
                                 snippet_html += f"- `{snippet}`\n"
+                            snippet_html += f"- {nodes_size} bytes\n"
+                            approx_tokens = nodes_size // 4
+                            if approx_tokens > generation_llm.context_window:
+                                snippet_html +=  f"- ~{approx_tokens} tokens > configured context size: {generation_llm.context_window}\n"
+                            if approx_tokens + generation_llm.max_tokens > GENERATION_MODEL_MAX_LEN:
+                                snippet_html += f"- {approx_tokens} + {generation_llm.max_tokens} > --max-model-len {GENERATION_MODEL_MAX_LEN}, generation LLM may return an empty response!"
                             snippet_html += "\n</details>\n\n"
                             yield make_chunk(snippet_html)
 
@@ -182,7 +191,6 @@ async def chat_endpoint(request: ChatRequest):
                             "</details>\n\n"
                         )
 
-                    # 3. Yield the final Tool Result
                     result_text = getattr(tool_output, "content", str(tool_output))
                     collapsible_tool_result = (
                         "<details>\n"
