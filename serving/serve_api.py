@@ -164,10 +164,15 @@ async def chat_endpoint(request: ChatRequest):
                     if raw_output and hasattr(raw_output, "source_nodes"):
                         nodes = raw_output.source_nodes
                         if nodes and len(nodes) > 1:
-                            yield make_chunk(
-                                f"🔍 {len(nodes)} records\n\n"
-                            )
-                                        
+                            snippet_html = f"<details>\n<summary>🔍 {len(nodes)} nodes retrieved</summary>\n\n"
+                            for i, node in enumerate(nodes):
+                                text = node.get_content() if hasattr(node, "get_content") else getattr(node, "text", "")
+                                clean_text = text.replace('\n', ' ').strip()
+                                snippet = clean_text[:80] + ("..." if len(clean_text) > 80 else "")
+                                snippet_html += f"- `{snippet}`\n"
+                            snippet_html += "\n</details>\n\n"
+                            yield make_chunk(snippet_html)
+
                     if raw_output and hasattr(raw_output, "metadata") and raw_output.metadata:
                         metadata = raw_output.metadata
                         yield make_chunk(
