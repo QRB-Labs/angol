@@ -33,7 +33,7 @@ from serving.prompt_templates import (
 
 # default max 20 thought-action-observation iterations is too much
 MAX_ITERATIONS = 15
-GENERATION_MODEL_MAX_LEN = int(os.getenv("GENERATION_MODEL_MAX_LEN", "16384"))
+GENERATION_MODEL_MAX_LEN = int(os.getenv("GENERATION_MODEL_MAX_LEN", "32768"))
 
 app = FastAPI()
 
@@ -47,7 +47,7 @@ generation_llm = OpenAILike(
     # context_window + max_tokens should be < --max-model-len in
     # vllm-model for generation model
     max_tokens=1024,
-    context_window=15000
+    context_window=GENERATION_MODEL_MAX_LEN - 1024
 )
 
 # 2. The Router LLM
@@ -58,7 +58,7 @@ router_llm = OpenAILike(
     is_chat_model=True,
     temperature=0.0,
     max_tokens=1024,
-    context_window=15000
+    context_window=GENERATION_MODEL_MAX_LEN - 1024
 )
 
 # Initialize Tools
