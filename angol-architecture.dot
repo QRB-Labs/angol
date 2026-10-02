@@ -40,7 +40,7 @@ digraph AngolEnterpriseAI {
 	{
 	    rank=same;
 	    // Forcing order: FAISS (Far Left) -> Qdrant (Middle) -> Postgres (Right)
-	    FAISS [label="K-Means Clustering", shape=hexagon, style=filled, fillcolor=lightyellow];
+	    FAISS [label="K-Means\nClustering", shape=hexagon, style=filled, fillcolor=lightyellow];
 	    Qdrant [label="Qdrant\nVector DB", shape=cylinder];
 	    Postgres [label="PostgreSQL\nTabular DB", shape=cylinder];
 	    FAISS -> Qdrant -> Postgres [style=invis];
@@ -51,18 +51,25 @@ digraph AngolEnterpriseAI {
 	label = "Serving";
 	style = dotted;
 
-	Router [label="Routing\nAgent", shape=diamond];
+	// Router Level
+	{
+	    rank=same;
+	    RouterLLM [label="Router LLM", shape=ellipse, style=filled, fillcolor=lightpink];
+	    Router [label="Routing\nAgent", shape=diamond];
+	}
+
+	// Tools Level
+	{
+	    rank=same;
+	    VectorTool [label="Vector tool"];
+	    GenLLM [label="Generation LLM", shape=ellipse, style=filled, fillcolor=lightpink];
+    	    SQLTool [label="SQL Tool"];
+	}
 	ServeEmbedModel [label="Embedding Model", shape=ellipse, style=filled, fillcolor=lightblue];
 
-	{
-	   rank=same;
-	   // GenLLM ordered before FastAPI so it gets rendered higher up
-	   RouterLLM [label="Router LLM", shape=ellipse, style=filled, fillcolor=lightpink];
-	    GenLLM [label="Generation LLM", shape=ellipse, style=filled, fillcolor=lightpink];
-	 }
 	FastAPI [label="FastAPI Middleware"];
     }
-    UserQuery [label="User Queries\n(Open WebUI)", shape=oval, style=filled, fillcolor=orange];
+    UserQuery [label="Open WebUI", shape=oval, style=filled, fillcolor=orange];
 
     // --- EDGES & FLOW ---
 
@@ -71,41 +78,43 @@ digraph AngolEnterpriseAI {
     RawDir -> Structured;
 
     // 2. The Structured Path (Right Side Vertical Spine)
-    Structured -> Pandas [weight=10];
-    Pandas -> Postgres [weight=10, label="SQL tables"];
+    Structured -> Pandas [weight=100];
+    Pandas -> Postgres [weight=100, label="SQL tables"];
 
     // 3. The Unstructured Path (Middle Strict Vertical Spine)
-    Unstructured -> Docling [weight=10];
-    Docling -> IngestEmbedModel [weight=10, label="chunks"];
-    IngestEmbedModel -> Qdrant [weight=10, label="nodes"];
+    Unstructured -> Docling [weight=100];
+    Docling -> IngestEmbedModel [weight=100, label="Chunks"];
+    IngestEmbedModel -> Qdrant [weight=100, label="Nodes"];
 
     // 4. The RAPTOR Loop (Far Left Spine)
     // We use dir=back to draw the arrow from Qdrant to FAISS while ensuring FAISS stays left
-    FAISS -> Qdrant [dir=back, label="level n nodes"];
+    FAISS -> Qdrant [dir=back, label="Level n nodes"];
 
     // IngestLLM stays straight above FAISS
-    IngestLLM -> FAISS [dir=back, weight=10, label="clusters of nodes"];
+    IngestLLM -> FAISS [dir=back, weight=100, label="Clusters of nodes"];
 
     // Feeds horizontally from IngestLLM (Left) to Embed Model (Middle)
-    IngestLLM -> IngestEmbedModel [label="level n+1 summaries"];
-
+    IngestLLM -> IngestEmbedModel [label="Level n+1 summaries"];
 
     // --- SERVING & GENERATION ---
 
-    // 5. DBs pass context down to the Router
-    Postgres -> Router [dir=back, label="SQL"];
-    Qdrant -> ServeEmbedModel [dir=back, weight=10, label="Vector search"];
-
-    // Router embedding call (separate copy for serving)
-    ServeEmbedModel -> Router [dir=back];
+    // 5. Tools query the dbs
+    Postgres -> SQLTool [dir=both, label="SQL"];
+    Qdrant -> VectorTool [dir=forward, label="Nodes"];
+    Qdrant -> ServeEmbedModel [dir=back, label="Vector search"];
+    
+    ServeEmbedModel -> VectorTool [dir=back];
+     VectorTool -> Router [dir=back];
+     SQLTool -> Router [dir=back];
 
     // 6. Router to GenLLM
-    Router -> RouterLLM [dir=back, weight=10, label="Translated Query\nw/ Intent"];
-    Router -> GenLLM [dir=forward, weight=10, label="Retrieval-Augmented\nPrompt"];
+    RouterLLM -> Router [dir=both];
+    VectorTool -> GenLLM [dir=forward, weight=10, label="Retrieval-Augmented\nPrompt"];
+    GenLLM -> SQLTool [dir=back, weight=10, label="Retrieval-Augmented\nPrompt"];
 
     // 7. Generation LLM to Middleware (Structuring it GenLLM->FastAPI forces FastAPI below)
-    RouterLLM -> FastAPI [dir=back, weight=10, label="Query	"];
-    GenLLM -> FastAPI [dir=forward, weight=10, label="Generated response"];
+    Router -> FastAPI [dir=both, weight=10];
+    GenLLM -> Router [dir=forward, weight=10, label="Generated response"];
 
     // 8. Middleware to User (Bottom Vertical Spine)
     FastAPI -> UserQuery [dir=both, weight=10]
