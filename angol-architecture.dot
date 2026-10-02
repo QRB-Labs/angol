@@ -1,4 +1,4 @@
-digraph AngolEnterpriseAI {
+digraph Angol {
     rankdir=TB;
     node [fontname="Helvetica", shape=box, style=rounded];
     edge [fontname="Helvetica", fontsize=10];
@@ -55,13 +55,13 @@ digraph AngolEnterpriseAI {
 	{
 	    rank=same;
 	    RouterLLM [label="Router LLM", shape=ellipse, style=filled, fillcolor=lightpink];
-	    Router [label="Routing\nAgent", shape=diamond];
+	    Router [label="ReAct\nAgent", shape=diamond];
 	}
 
 	// Tools Level
 	{
 	    rank=same;
-	    VectorTool [label="Vector tool"];
+	    VectorTool [label="Vector Tool"];
 	    GenLLM [label="Generation LLM", shape=ellipse, style=filled, fillcolor=lightpink];
     	    SQLTool [label="SQL Tool"];
 	}
@@ -109,12 +109,12 @@ digraph AngolEnterpriseAI {
 
     // 6. Router to GenLLM
     RouterLLM -> Router [dir=both];
-    VectorTool -> GenLLM [dir=forward, weight=10, label="Retrieval-Augmented\nPrompt"];
-    GenLLM -> SQLTool [dir=back, weight=10, label="Retrieval-Augmented\nPrompt"];
+    VectorTool -> GenLLM [dir=forward, weight=10, label="Retrieval\naugmented\nprompt"];
+    GenLLM -> SQLTool [dir=back, weight=10, label="Retrieval\naugmented\nprompt"];
 
     // 7. Generation LLM to Middleware (Structuring it GenLLM->FastAPI forces FastAPI below)
     Router -> FastAPI [dir=both, weight=10];
-    GenLLM -> Router [dir=forward, weight=10, label="Generated response"];
+    GenLLM -> Router [dir=forward, weight=10, label="Observation"];
 
     // 8. Middleware to User (Bottom Vertical Spine)
     FastAPI -> UserQuery [dir=both, weight=10]

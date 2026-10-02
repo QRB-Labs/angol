@@ -10,7 +10,7 @@ Corpus: Up to 1TB of documents
 Runs locally on a NDVIDIA GDX Spark or less.
 -->
 
-# Angol Enterprise AI - High-level design
+# Angol - High-level design
 
 - [Objective](#objective)
 - [Overview](#overview)
@@ -22,8 +22,8 @@ Runs locally on a NDVIDIA GDX Spark or less.
   - [5. Retrieval & Generation Layer](#5-retrieval--generation-layer)
     - [Step 1: Query Vectorization (The translation)](#step-1-query-vectorization-the-translation)
     - [Step 2: The RAPTOR Database Search (Fetching Context)](#step-2-the-raptor-database-search-fetching-context)
-    - [Step 3: Context Assembly (The Handoff to Reasoning / Generation LLM)](#step-3-context-assembly-the-handoff-to-reasoning--generation-llm)
-    - [Step 4: Generation and Citation](#step-4-generation-and-citation)
+    - [Step 3: Context Assembly (Generating the Tool Observation)](#step-3-context-assembly-generating-the-tool-observation)
+    - [Step 4: Observation and Final Generation](#step-4-observation-and-final-generation)
   - [6. User Interface](#6-user-interface)
 - [Quantitative Estimates](#quantitative-estimates)
 - [Design Alternatives](#design-alternatives)
@@ -39,8 +39,8 @@ The system utilizes an advanced Retrieval-Augmented Generation (RAG) architectur
 ## Detailed Design
 ![Angol Architecture](angol-architecture.png)
 ### 1. Ingestion & Parsing Layer
-*   **PDF/PPT Extraction:** Uses IBM's [Docling](https://github.com/DS4SD/docling) or [Unstructured](https://unstructured.io/) to parse complex layouts and slide decks via specialized Vision/OCR models.
-*   **Spreadsheet Parsing:** Small sheets are converted to Markdown tables. Massive datasets bypass the vector space and are ingested into a local PostgreSQL database for Text-to-SQL agentic querying.
+*   **Document Extraction:** Uses IBM's [Docling](https://github.com/DS4SD/docling) or [Unstructured](https://unstructured.io/) to parse documents, including complex layouts and slide decks via specialized Vision/OCR models.
+*   **Spreadsheet Parsing:** Datasets from CSV or spreadsheet files are ingested into a local PostgreSQL database for Text-to-SQL agentic querying.
 *   **Metadata Tagging:** Every chunk is aggressively tagged with metadata (Author, Date, Department, Page Number, Document ID) to enable accurate citation generation down the pipeline.
 
 ### 2. Chunking & Embedding Layer
@@ -61,27 +61,27 @@ To enable holistic reasoning across the corpus, data is grouped and summarized h
 
 ### 5. Retrieval & Generation Layer
 *   **Model Serving:** [vLLM](https://github.com/vllm-project/vllm) for high-throughput, memory-efficient LLM serving.
-*   **Reasoning Engine:** [Qwen-2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) or [Meta Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct). Selected for high reasoning capabilities within constrained VRAM.
-*   **Routing Agent:** Managed by LlamaIndex via a **ReAct (Reasoning and Acting) Agent**. Instead of making a single routing guess, the Agent maintains conversation history and operates in a continuous "Thought &rarr; Action &rarr; Observation" loop. It evaluates the user's intent, selects a tool (Vector DB or PostgreSQL), reads the tool's output, and decides if it has enough information to synthesize an answer. If a tool fails (e.g., a SQL table is missing), the Agent intelligently catches the error and reroutes the query to the Vector DB.
+*   **Router LLM:** [Qwen-2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) or [Meta Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct). Selected for high reasoning capabilities within constrained VRAM. Serves as the routing/reasoning engine for the Agent.
+*   **Generation LLM:** Generates observations from tool call results. Can be the same instance as the Router LLM.
+*   **Routing/Reasoning Agent:** Managed by LlamaIndex via a **ReAct (Reasoning and Acting) Agent**, powered by the **Router LLM**. Instead of making a single routing guess, the Agent maintains conversation history and operates in a continuous "Thought &rarr; Action &rarr; Observation" loop. It evaluates the user's intent, selects a tool (Vector DB or PostgreSQL), reads the tool's output, and decides if it has enough information to synthesize an answer. If a tool fails (e.g., a SQL table is missing), the Agent intelligently reformulates or reroutes the query to another tool.
 
-**LlamaIndex** acts as the Routing Agent, bridging the user, the tools (Qdrant/PostgreSQL), and the LLM. When the Agent decides to use the Vector DB to answer a conceptual question, it executes the following 4-step programmatic workflow:
+**LlamaIndex** acts as the Routing/Reasoning Agent, bridging the user, the tools (Qdrant/PostgreSQL), and the LLMs. When the Agent decides to use the Vector DB to answer a conceptual question, it executes the following 4-step programmatic workflow:
 
 #### Step 1: Query Vectorization (The translation)
 When a user submits a prompt (e.g., *"Summarize the supply chain risks in Europe for 2023"*):
-1. **Routing:** The Routing Agent determines this is a text-based query, not a math/spreadsheet query.
-2. **Embedding:** The Routing Agent sends the user's raw text prompt to the **BGE-M3** embedding model.
+1. **Routing:** The Routing/Reasoning Agent determines this is a text-based query, not a math/spreadsheet query.
+2. **Embedding:** The Agent sends the user's raw text prompt to the **BGE-M3** embedding model.
 3. BGE-M3 translates the user's English prompt into a single 1024-dimensional query vector.
 
 #### Step 2: The RAPTOR Database Search (Fetching Context)
-The Routing Agent sends this single query vector to **Qdrant**.
+The Agent sends this single query vector to **Qdrant** via the Vector DB tool.
 1. **Hybrid Search:** Qdrant performs a hybrid search against the 40 Million vectors in RAM. It looks for both mathematical proximity (HNSW Vector Search) and exact keyword matches (Sparse/BM25 Search).
 2. **Tree Collapse Search:** Because of the RAPTOR architecture, Qdrant searches the *entire* hierarchy simultaneously, from **Level 0 Leaf Nodes** (raw document chunks) to **Level 1, 2 or 3 Summary Nodes** (synthesized overviews).
-3. Qdrant returns the Top 20 results to the Routing Agent. These results are returned as JSON objects containing the **Original Text Payload** and the **Metadata Array** (citations, page numbers, source docs).
+3. Qdrant returns the Top 20 results to the Vector DB tool. These results are returned as JSON objects containing the **Original Text Payload** and the **Metadata Array** (citations, page numbers, source docs).
 
-#### Step 3: Context Assembly (The Handoff to Reasoning / Generation LLM)
+#### Step 3: Context Assembly (Generating the Tool Observation)
 
-The Routing Agent takes the Top 20 text payloads retrieved from Qdrant and injects them into a strict **System Prompt Template** in the Generation LLM's context window, via **vLLM** as follows:
-
+The Vector DB tool takes the Top 20 text payloads retrieved from Qdrant and injects them into a strict **System Prompt Template** in the Generation LLM's context window, via **vLLM** as follows:
 ```text
 <|im_start|>system
 You are an expert enterprise AI assistant. You must answer the user's question using ONLY the provided context below. If the context does not contain the answer, say "I do not know." 
@@ -101,14 +101,12 @@ Summarize the supply chain risks in Europe for 2023.
 <|im_end|>
 <|im_start|>assistant
 ```
+#### Step 4: Observation and Final Generation
+1. **Observation Generation:** The Generation LLM reads the fully assembled prompt. Because it is an Instruction-Tuned model (`-Instruct`), it strictly obeys the system prompt. It evaluates the competing facts in the provided context and generates an Observation for the agent.
+2. **Reasoning Loop:** The Routing/Reasoning Agent reads this Observation. It decides if this is enough information to fully answer the user's question. If not, it decides on another action (e.g., an additional tool call).
+3. **Final Output:** If the Routing/Reasoning Agent decides it has enough information, it generates the final answer and streams the text back to the User Interface, preserving the citations derived from the Observation (e.g., *"Supply chain risks increased by 14% [Report_2023.pdf, Page 42], however, automation offset these delays [Multi-Doc Summary Node]."*). 
 
-#### Step 4: Generation and Citation
-1. **Inference:** The Generation LLM reads the fully assembled prompt. Because it is an Instruction-Tuned model (`-Instruct`), it strictly obeys the system prompt.
-2. **Synthesis:** It evaluates the competing facts in the provided context (understanding that Level 2 nodes are high-level summaries and Level 0 nodes are granular facts).
-3. **Output:** It streams the final text back to the User Interface, explicitly injecting the citations provided by Qdrant's metadata (e.g., *"Supply chain risks increased by 14% [Report_2023.pdf, Page 42], however, automation offset these delays [Multi-Doc Summary Node]."*). 
-
-**Summary of the Interaction:** The Vector Database acts purely as an ultra-fast semantic filter. The Generation LLM acts purely as a reasoning and reading engine. The Routing Agent (LlamaIndex) facilitates the handoff by wrapping the database's text results into a prompt that the LLM can read.
-
+* **Summary of the Interaction:** The Vector Database acts purely as an ultra-fast semantic filter. The Generation LLM purely gets results from the tools and generates an observation. **LlamaIndex manages the ReAct loop, using the Router LLM as the central reasoning engine** to decide which tools to call, evaluate their observations, and ultimately generate the final answer.
 
 ### 6. User Interface
 *   **Frontend:** [Open WebUI](https://github.com/open-webui/open-webui). Provides a ChatGPT-like interface with built-in citation rendering and document snippet viewing.

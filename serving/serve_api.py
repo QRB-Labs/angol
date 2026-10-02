@@ -3,9 +3,9 @@ This is the **Middleware**. Its job is to:
 1. Pretend to be an OpenAI API server so Open WebUI can talk to it.
 2. Intercept the user's question from the frontend.
 3. Use the LlamaIndex library to search your Qdrant database.
-4. Package the retrieved documents and the user's question into a prompt.
-5. Send that packaged prompt to vLLM to get the final answer.
-6. Pass the answer back up to Open WebUI.
+4. Route the query using a Reasoning Agent to select the right tool.
+5. Use the Generation LLM to summarize tool results into an observation.
+6. Pass the Agent's final synthesized answer back up to Open WebUI.
 '''
 import os
 import json
@@ -159,7 +159,7 @@ async def chat_endpoint(request: ChatRequest):
                     tool_output = getattr(event, "tool_output", None)
                     if not tool_output:
                         continue
-                        
+
                     raw_output = getattr(tool_output, "raw_output", None)
 
                     if raw_output and hasattr(raw_output, "source_nodes"):
@@ -191,11 +191,11 @@ async def chat_endpoint(request: ChatRequest):
                             "</details>\n\n"
                         )
 
-                    result_text = getattr(tool_output, "content", str(tool_output))
+                    observation_text = getattr(tool_output, "content", str(tool_output))
                     collapsible_tool_result = (
                         "<details>\n"
-                        "<summary>📄 Results</summary>\n\n"
-                        f"```text\n{result_text}\n```\n"
+                        "<summary>📄 Observation</summary>\n\n"
+                        f"```text\n{observation_text}\n```\n"
                         "</details>\n\n"
                     )
                     yield make_chunk(collapsible_tool_result)
