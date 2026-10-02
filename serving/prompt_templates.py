@@ -3,7 +3,7 @@ GENERATION_SYSTEM_PROMPT = """You are an internal data extraction and synthesis 
 CRITICAL INSTRUCTIONS:
 1. Base your answer purely on the provided context. Do not use outside knowledge.
 2. EXHAUSTIVE EXTRACTION: Keep all details about all facts that may be relevant to the query. Do NOT summarize, condense, or omit data points. If data spans multiple years or documents, extract and list every single instance.
-3. You MUST preserve and append the exact source metadata (title, author, file_name, page numbers, etc.) to every fact or claim you extract. If the context provides a citation, you must pass it forward in your response.
+3. You MUST preserve and append the exact source metadata (title, author, file_name, page numbers, child_citations etc.) to every fact or claim you extract.
 4. Do not use conversational filler, greetings, or pleasantries. Focus purely on data accuracy, detail, and retaining source metadata so the main agent can cite it properly.
 """
 
@@ -13,7 +13,7 @@ CRITICAL INSTRUCTIONS FOR REASONING & CITATIONS:
 1. When you receive an 'Observation' from a tool, you must preserve and use the exact metadata (file_name, page, child_citations, etc.) provided in that observation for your final answer.
 2. You MUST cite your sources inline whenever you state a fact, metric, or summarize a claim based on a tool observation. Format citations cleanly at the end of the relevant sentence or bullet point.
 3. If the question is about a range of times, a list of regions, or items, and you have only a partial answer in the observations, use the tools to dig deeper more narrowly around the missing times, regions or items.
-4. If an observation is related but insufficiently detailed, don't stop, it might be a high level summary node, repeat the tool call with narrower terms.
+4. If an observation is related but insufficiently detailed, check its metadata. **IF the observation has a `raptor_level > 0` or lists `child_citations`, it is a high-level summary. You MUST NOT stop.** Your immediate next step must be to query the tools again to drill down into those specific sources. Explicitly include the exact file names, child citation IDs, or topics from that summary in your next Action Input to fetch the granular details.
 5. DO NOT hallucinate citations. Only use the exact metadata provided in the tool observations.
 6. If the tools do not provide the answer, explicitly state that you do not have the information in your databases. Do not rely on your pre-trained outside knowledge.
 7. When presenting results be precise, exhaustive, and format clearly (e.g., using bullet points or markdown tables if appropriate). If tools return data across multiple years or documents, present all of it. Do not over-summarize.
@@ -28,6 +28,7 @@ VECTOR_TOOL_DESCRIPTION = (
     "Uses a RAPTOR hierarchical clustering system to provide both high-level summaries and specific document details. "
     "Action Input should be a specific, well-formatted natural language search query based on the user's question. "
     "If the question implies a range of time or entities, explicitly state 'extract all available details' in your query."
+    "You can force the tool to search within specific documents by explicitly including their file names or child citation IDs in your query (e.g., 'What are the specific delays mentioned in child_citation: Logistics_Q1.pdf?')."
 )
 
 SQL_TOOL_DESCRIPTION = (
