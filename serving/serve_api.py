@@ -9,6 +9,7 @@ This is the **Middleware**. Its job is to:
 '''
 import os
 import json
+import time
 from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI
@@ -31,7 +32,7 @@ from serving.prompt_templates import (
 )
 
 # default max 20 thought-action-observation iterations is too much
-MAX_ITERATIONS = 8
+MAX_ITERATIONS = 15
 GENERATION_MODEL_MAX_LEN = int(os.getenv("GENERATION_MODEL_MAX_LEN", "16384"))
 
 app = FastAPI()
@@ -117,9 +118,8 @@ async def chat_endpoint(request: ChatRequest):
         return f'data: {json.dumps({"choices": [{"delta": {"content": text}}]})}\n\n'
 
     async def event_generator():
-        yield make_chunk("⚙️ *Working...*\n\n")
-
         try:
+            start_time = time.time()
             # 1. Start the workflow (returns a background handler immediately)
             handler = routing_agent.run(user_msg=user_query, chat_history=chat_history,
                                         max_iterations=MAX_ITERATIONS, early_stopping_method="generate")
@@ -130,8 +130,26 @@ async def chat_endpoint(request: ChatRequest):
             async for event in handler.stream_events():
                 event_name = type(event).__name__
 
+                if event_name == "StartEvent":
+                    yield make_chunk("🚀 *Started...*\n\n")
+                elif event_name == "StopEvent":
+                    elapsed_time = time.time() - start_time
+                    hours, rem = divmod(elapsed_time, 3600)
+                    minutes, seconds = divmod(rem, 60)
+                    if hours > 0:
+                        duration_str = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+                    elif minutes > 0:
+                        duration_str = f"{int(minutes)}m {int(seconds)}s"
+                    else:
+                        duration_str = f"{seconds:.1f}s"
+                    yield make_chunk(f"🏁 *Finished in {duration_str}...*\n\n")
+                elif event_name == "AgentInput":
+                    yield make_chunk(f"➡️  *Input received, working...*\n\n")
+                elif event_name == "AgentOutput" and getattr(event.response, "is_error", False):
+                    error_msg = getattr(event.response, "error_message", "Unknown parsing error")
+                    yield make_chunk(f"⚠️  Error: {error_msg}\n\n")
                 # --- Catch Structured ThinkingBlocks (for <think> models) ---
-                if event_name == "AgentOutput" and hasattr(event, "response") and hasattr(event.response, "blocks"):
+                elif event_name == "AgentOutput" and hasattr(event, "response") and hasattr(event.response, "blocks"):
                     for block in event.response.blocks:
                         if getattr(block, "block_type", "") == "thinking":
                             thought = getattr(block, "content", "").strip()
