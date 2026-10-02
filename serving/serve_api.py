@@ -32,6 +32,7 @@ from serving.prompt_templates import (
 
 # default max 20 thought-action-observation iterations is too much
 MAX_ITERATIONS = 8
+GENERATION_MODEL_MAX_LEN = int(os.getenv("GENERATION_MODEL_MAX_LEN", "16384"))
 
 app = FastAPI()
 
@@ -45,7 +46,7 @@ generation_llm = OpenAILike(
     # context_window + max_tokens should be < --max-model-len in
     # vllm-model for generation model
     max_tokens=1024,
-    context_window=10000
+    context_window=15000
 )
 
 # 2. The Router LLM
@@ -56,7 +57,7 @@ router_llm = OpenAILike(
     is_chat_model=True,
     temperature=0.0,
     max_tokens=1024,
-    context_window=10000
+    context_window=15000
 )
 
 # Initialize Tools
@@ -128,7 +129,6 @@ async def chat_endpoint(request: ChatRequest):
             # 2. Iterate over internal events as they happen
             async for event in handler.stream_events():
                 event_name = type(event).__name__
-                event_str = str(event)
 
                 # --- Catch Structured ThinkingBlocks (for <think> models) ---
                 if event_name == "AgentOutput" and hasattr(event, "response") and hasattr(event.response, "blocks"):
@@ -138,7 +138,7 @@ async def chat_endpoint(request: ChatRequest):
                             if thought and thought != last_thought:
                                 collapsible_thought = (
                                     "<details>\n"
-                                    "<summary>🧠 Thinking...</summary>\n\n"
+                                    "<summary>🧠 Thought...</summary>\n\n"
                                     f"{thought}\n"
                                     "</details>\n\n"
                                 )
@@ -147,15 +147,51 @@ async def chat_endpoint(request: ChatRequest):
                 # --- If it's a Tool ACTION ---
                 elif event_name == "ToolCall":
                     tool_name = getattr(event, "tool_name", "tool")
-                    yield make_chunk(f"🔀 *Action: using {tool_name}...*\n\n")
+                    tool_kwargs = getattr(event, "tool_kwargs", {})
+                    kwargs_str = json.dumps(tool_kwargs, ensure_ascii=False) if tool_kwargs else "()"
+                    collapsible_action = ( "<details>\n"
+                                           f"<summary>🔀 Action: {tool_name}</summary>\n\n"
+                                           f"```json\n{kwargs_str}```\n"
+                                           "</details>\n\n")
+                    yield make_chunk(collapsible_action)
                 # --- If it's a Tool RESULT ---
                 elif event_name == "ToolCallResult":
-                    # Extract the output payload from the event safely
-                    tool_output = getattr(event, "tool_output", event_str)
-                    # ToolOutput objects usually have a content attribute, otherwise stringify it
-                    result_text = getattr(tool_output, "content", str(tool_output))
+                    tool_output = getattr(event, "tool_output", None)
+                    if not tool_output:
+                        continue
+                        
+                    raw_output = getattr(tool_output, "raw_output", None)
 
-                    # Yield it wrapped in a collapsible details block
+                    if raw_output and hasattr(raw_output, "source_nodes"):
+                        nodes = raw_output.source_nodes
+                        if nodes:
+                            snippet_html = f"<details>\n<summary>🔍 {len(nodes)} nodes retrieved</summary>\n\n"
+                            nodes_size = 0
+                            for i, node in enumerate(nodes):
+                                text = node.get_content() if hasattr(node, "get_content") else getattr(node, "text", "")
+                                nodes_size += len(text)
+                                clean_text = text.replace('\n', ' ').strip()
+                                snippet = clean_text[:80] + ("..." if len(clean_text) > 80 else "")
+                                snippet_html += f"- `{snippet}`\n"
+                            snippet_html += f"- {nodes_size} bytes\n"
+                            approx_tokens = nodes_size // 4
+                            if approx_tokens > generation_llm.context_window:
+                                snippet_html +=  f"- ~{approx_tokens} tokens > configured context size: {generation_llm.context_window}\n"
+                            if approx_tokens + generation_llm.max_tokens > GENERATION_MODEL_MAX_LEN:
+                                snippet_html += f"- {approx_tokens} + {generation_llm.max_tokens} > --max-model-len {GENERATION_MODEL_MAX_LEN}, generation LLM may return an empty response!"
+                            snippet_html += "\n</details>\n\n"
+                            yield make_chunk(snippet_html)
+
+                    if raw_output and hasattr(raw_output, "metadata") and raw_output.metadata:
+                        metadata = raw_output.metadata
+                        yield make_chunk(
+                            "<details>\n"
+                            "<summary>🏷️  Metadata</summary>\n\n"
+                            f"```json\n{metadata}\n```\n"
+                            "</details>\n\n"
+                        )
+
+                    result_text = getattr(tool_output, "content", str(tool_output))
                     collapsible_tool_result = (
                         "<details>\n"
                         "<summary>📄 Results</summary>\n\n"
@@ -163,7 +199,6 @@ async def chat_endpoint(request: ChatRequest):
                         "</details>\n\n"
                     )
                     yield make_chunk(collapsible_tool_result)
-                # else: other event
 
             # 3. Once the workflow is done, await the final answer
             response = await handler

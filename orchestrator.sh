@@ -92,7 +92,7 @@ else
 	--ipc=host \
 	vllm/vllm-openai:latest \
 	--model ${GENERATION_MODEL} \
-	--max-model-len 16384 \
+	--max-model-len ${GENERATION_MODEL_MAX_LEN} \
 	--gpu-memory-utilization 0.80 \
 	$GENERATION_EXTRA_FLAGS
 
