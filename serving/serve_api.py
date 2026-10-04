@@ -9,6 +9,7 @@ This is the **Middleware**. Its job is to:
 '''
 import os
 import json
+import logging
 import time
 from dotenv import load_dotenv
 load_dotenv()
@@ -18,9 +19,10 @@ from pydantic import BaseModel
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.agent.workflow import ReActAgent
+from llama_index.core.callbacks.schema import EventPayload
 
 # FIX FOR LLAMAINDEX WORKFLOW BUG
-# Forces the Pydantic-based agent to be hashable so the internal cache doesn't crash
+# Forces Pydantic-based agent to be hashable so internal cache doesn't crash
 ReActAgent.__hash__ = object.__hash__
 
 from serving.router_tools import get_vector_tool, get_sql_tool
@@ -37,6 +39,10 @@ GENERATION_MODEL_MAX_LEN = int(os.getenv("GENERATION_MODEL_MAX_LEN", "32768"))
 
 app = FastAPI()
 
+logging.basicConfig(level=logging.INFO)
+httpx_logger = logging.getLogger("httpx")
+httpx_logger.setLevel(logging.DEBUG)
+
 # 1. The Generation LLM
 generation_llm = OpenAILike(
     api_base="http://localhost:8000/v1",
@@ -44,10 +50,9 @@ generation_llm = OpenAILike(
     model=os.getenv("GENERATION_MODEL"),
     system_prompt=GENERATION_SYSTEM_PROMPT,
     is_chat_model=True,
-    # context_window + max_tokens should be < --max-model-len in
-    # vllm-model for generation model
+    # context_window + max_tokens should be < max-model-len in vllm-model
     max_tokens=1024,
-    context_window=GENERATION_MODEL_MAX_LEN - 1024
+    context_window=GENERATION_MODEL_MAX_LEN - 2048
 )
 
 # 2. The Router LLM
@@ -103,7 +108,11 @@ async def chat_endpoint(request: ChatRequest):
     chat_history = []
     for msg in request.messages[:-1]:
         role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
-        chat_history.append(ChatMessage(role=role, content=msg.get("content", "")))
+        content=msg.get("content", "")
+        if role == MessageRole.ASSISTANT and "**✅ Answer:**" in content:
+            # Keep ONLY the final answer in conversation history, not intermediate observations, etc.
+            content = content.split("**✅ Answer:**")[-1].strip()
+        chat_history.append(ChatMessage(role=role, content=content))
 
     if not request.stream:
         response = await routing_agent.run(
@@ -130,9 +139,7 @@ async def chat_endpoint(request: ChatRequest):
             async for event in handler.stream_events():
                 event_name = type(event).__name__
 
-                if event_name == "StartEvent":
-                    yield make_chunk("🚀 *Started...*\n\n")
-                elif event_name == "StopEvent":
+                if event_name == "StopEvent":
                     elapsed_time = time.time() - start_time
                     hours, rem = divmod(elapsed_time, 3600)
                     minutes, seconds = divmod(rem, 60)
@@ -145,9 +152,6 @@ async def chat_endpoint(request: ChatRequest):
                     yield make_chunk(f"🏁 *Finished in {duration_str}...*\n\n")
                 elif event_name == "AgentInput":
                     yield make_chunk(f"➡️  *Input received, working...*\n\n")
-                elif event_name == "AgentOutput" and getattr(event.response, "is_error", False):
-                    error_msg = getattr(event.response, "error_message", "Unknown parsing error")
-                    yield make_chunk(f"⚠️  Error: {error_msg}\n\n")
                 # --- Catch Structured ThinkingBlocks (for <think> models) ---
                 elif event_name == "AgentOutput" and hasattr(event, "response") and hasattr(event.response, "blocks"):
                     for block in event.response.blocks:
@@ -156,7 +160,7 @@ async def chat_endpoint(request: ChatRequest):
                             if thought and thought != last_thought:
                                 collapsible_thought = (
                                     "<details>\n"
-                                    "<summary>🧠 Thought...</summary>\n\n"
+                                    "<summary>🧠 Thought</summary>\n\n"
                                     f"{thought}\n"
                                     "</details>\n\n"
                                 )
@@ -168,7 +172,7 @@ async def chat_endpoint(request: ChatRequest):
                     tool_kwargs = getattr(event, "tool_kwargs", {})
                     kwargs_str = json.dumps(tool_kwargs, ensure_ascii=False) if tool_kwargs else "()"
                     collapsible_action = ( "<details>\n"
-                                           f"<summary>🔀 Action: {tool_name}</summary>\n\n"
+                                           f"<summary>🔀 Action: {tool_name}...</summary>\n\n"
                                            f"```json\n{kwargs_str}```\n"
                                            "</details>\n\n")
                     yield make_chunk(collapsible_action)
@@ -176,6 +180,12 @@ async def chat_endpoint(request: ChatRequest):
                 elif event_name == "ToolCallResult":
                     tool_output = getattr(event, "tool_output", None)
                     if not tool_output:
+                        continue
+
+                    if getattr(tool_output, "is_error", False):
+                        error_msg = getattr(tool_output, "content", "Unknown tool execution error")
+                        yield make_chunk(f"⚠️  **Tool Error:** {error_msg}\n\n")
+                        # Continue, ReAct agent will see the error observation and try to fix it
                         continue
 
                     raw_output = getattr(tool_output, "raw_output", None)
@@ -196,7 +206,7 @@ async def chat_endpoint(request: ChatRequest):
                             if approx_tokens > generation_llm.context_window:
                                 snippet_html +=  f"- ~{approx_tokens} tokens > configured context size: {generation_llm.context_window}\n"
                             if approx_tokens + generation_llm.max_tokens > GENERATION_MODEL_MAX_LEN:
-                                snippet_html += f"- {approx_tokens} + {generation_llm.max_tokens} > --max-model-len {GENERATION_MODEL_MAX_LEN}, generation LLM may return an empty response!"
+                                snippet_html += f"- {approx_tokens} + {generation_llm.max_tokens} > max-model-len {GENERATION_MODEL_MAX_LEN}, generation LLM may return an empty response!"
                             snippet_html += "\n</details>\n\n"
                             yield make_chunk(snippet_html)
 
@@ -205,18 +215,48 @@ async def chat_endpoint(request: ChatRequest):
                         yield make_chunk(
                             "<details>\n"
                             "<summary>🏷️  Metadata</summary>\n\n"
-                            f"```json\n{metadata}\n```\n"
+                            f"```json\n{json.dumps(metadata, indent=2)}\n```\n"
                             "</details>\n\n"
                         )
 
-                    observation_text = getattr(tool_output, "content", str(tool_output))
-                    collapsible_tool_result = (
-                        "<details>\n"
-                        "<summary>📄 Observation</summary>\n\n"
-                        f"```text\n{observation_text}\n```\n"
-                        "</details>\n\n"
-                    )
-                    yield make_chunk(collapsible_tool_result)
+                    observation_text = getattr(tool_output, "content", None)
+                    if observation_text is None or str(observation_text).strip() in ["", "None"]:
+                        # No Observation, dump debug info
+                        debug_data = {
+                            "tool_name": getattr(tool_output, "tool_name", "Unknown"),
+                            "tool_inputs": getattr(tool_output, "raw_input", {}), 
+                            "raw_output_type": str(type(raw_output)) if raw_output else "None",
+                        }
+                        
+                        # Inspect the underlying Response object
+                        if raw_output:
+                            # LlamaIndex Response objects store the string answer in .response
+                            debug_data["raw_output_response_attr"] = getattr(raw_output, "response", "Not found")
+                            # Check if the query engine suppressed an exception
+                            if hasattr(raw_output, "exception") and raw_output.exception:
+                                debug_data["raw_output_exception"] = str(raw_output.exception)
+                                
+                        # Inspect the LlamaIndex Event Payload for hidden exceptions
+                        if hasattr(event, "payload") and event.payload:
+                            debug_data["payload_keys"] = list(event.payload.keys())
+                            # Try to extract the literal exception from the payload if it exists
+                            if EventPayload.EXCEPTION in event.payload:
+                                debug_data["payload_exception"] = str(event.payload[EventPayload.EXCEPTION])
+                        # TODO: should log debug_data on server side, not send to ui
+                        yield make_chunk((
+                            "<details>\n"
+                            "<summary>⚠️  No observation</summary>\n\n"
+                            f"```json\n{json.dumps(debug_data, indent=2, default=str)}\n```\n"
+                            "</details>\n\n"
+                        ))
+                    else:
+                        collapsible_tool_result = (
+                            "<details>\n"
+                            "<summary>📄 Observation</summary>\n\n"
+                            f"```text\n{observation_text}\n```\n"
+                            "</details>\n\n"
+                        )
+                        yield make_chunk(collapsible_tool_result)
 
             # 3. Once the workflow is done, await the final answer
             response = await handler

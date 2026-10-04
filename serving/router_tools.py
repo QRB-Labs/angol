@@ -13,6 +13,8 @@ from llama_index.core.base.response.schema import Response
 from llama_index.core.query_engine import CustomQueryEngine
 from llama_index.core.base.base_query_engine import BaseQueryEngine
 from serving.prompt_templates import VECTOR_TOOL_DESCRIPTION, SQL_TOOL_DESCRIPTION
+from llama_index.core import Settings
+from llama_index.core.callbacks import CallbackManager, LlamaDebugHandler
 
 
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
@@ -25,6 +27,9 @@ PG_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
 PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DB = os.getenv("POSTGRES_DB", "angol_db")
+
+llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+Settings.callback_manager = CallbackManager([llama_debug])
 
 
 class SafeQueryEngineWrapper(CustomQueryEngine):
@@ -58,7 +63,8 @@ def get_vector_tool(llm):
     
     query_engine = index.as_query_engine(
         llm=llm,
-        similarity_top_k=VECTOR_TOP_K
+        similarity_top_k=VECTOR_TOP_K,
+        response_mode="tree_summarize"  # Synthesize in chunks if context too large
     )
     
     safe_query_engine = SafeQueryEngineWrapper(
