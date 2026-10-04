@@ -52,7 +52,7 @@ The system utilizes an advanced Retrieval-Augmented Generation (RAG) architectur
 To enable holistic reasoning across the corpus, data is grouped and summarized hierarchically:
 *   **Metadata Partitioning:** Vectors are first bucketed by metadata (e.g., Department, Year) into batches of 20,000 to 40,000 chunks to prevent memory overflow.
 *   **GPU Clustering:** [NVIDIA FAISS](https://github.com/facebookresearch/faiss) runs GPU-accelerated K-Means clustering on the buckets to group related chunks across different documents (with K=200 to 400 clusters per batch, maintaining a 100:1 compression ratio; lower ratio gains accuracy on small signals but costs more in ingestion time and run-time memory).
-*   **Summarization:** A dedicated Ingestion LLM (highly recommended: **Meta Llama-3.1-8B-Instruct** deployed via **vLLM** for maximum batch-processing throughput on English corpora) reads the concatenated text of each cluster and generates a comprehensive summary. This new summary text is then embedded and pushed back into the vector database, explicitly storing the source document citations of all underlying child nodes as metadata to preserve accurate lineage and attribution.
+*   **Summarization:** A dedicated Ingestion LLM (e.g. **Meta Llama-3.1-8B-Instruct** for English corpora) reads the concatenated text of each cluster and generates a comprehensive summary. This new summary text is then embedded and pushed back into the vector database, explicitly storing the source document citations of all underlying child nodes as metadata to preserve accurate lineage and attribution.
 *   **Recursion:** Summaries are clustered and summarized iteratively until a "Root Node" executive summary is reached.
 
 ### 4. Storage Layer
@@ -65,23 +65,28 @@ To enable holistic reasoning across the corpus, data is grouped and summarized h
 *   **Generation LLM:** Generates observations from tool call results. Can be the same instance as the Router LLM.
 *   **Routing/Reasoning Agent:** Managed by LlamaIndex via a **ReAct (Reasoning and Acting) Agent**, powered by the **Router LLM**. Instead of making a single routing guess, the Agent maintains conversation history and operates in a continuous "Thought &rarr; Action &rarr; Observation" loop. It evaluates the user's intent, selects a tool (Vector DB or PostgreSQL), reads the tool's output, and decides if it has enough information to synthesize an answer. If a tool fails (e.g., a SQL table is missing), the Agent intelligently reformulates or reroutes the query to another tool.
 
-**LlamaIndex** acts as the Routing/Reasoning Agent, bridging the user, the tools (Qdrant/PostgreSQL), and the LLMs. When the Agent decides to use the Vector DB to answer a conceptual question, it executes the following 4-step programmatic workflow:
+**LlamaIndex** acts as the Routing/Reasoning Agent, bridging the user, the tools (Qdrant/PostgreSQL), and the LLMs. 
 
-#### Step 1: Query Vectorization (The translation)
-When a user submits a prompt (e.g., *"Summarize the supply chain risks in Europe for 2023"*):
-1. **Routing:** The Routing/Reasoning Agent determines this is a text-based query, not a math/spreadsheet query.
-2. **Embedding:** The Agent sends the user's raw text prompt to the **BGE-M3** embedding model.
-3. BGE-M3 translates the user's English prompt into a single 1024-dimensional query vector.
+When a user submits a prompt (e.g., *"Summarize the supply chain risks in Europe for 2023"*), the Agent asks the Routing LLM to judge the query intent and decide which tool to use.
+
+#### Step 1: Query translation
+If the vector tool is being used:
+1. **Embedding:** The Agent sends the user's query text to the **BGE-M3** embedding model.
+2. BGE-M3 translates the user's query into a single 1024-dimensional query vector.
+
+If the SQL tool is being used, it generates an SQL query.
 
 #### Step 2: The RAPTOR Database Search (Fetching Context)
-The Agent sends this single query vector to **Qdrant** via the Vector DB tool.
+If vector tool is being used:
 1. **Hybrid Search:** Qdrant performs a hybrid search against the 40 Million vectors in RAM. It looks for both mathematical proximity (HNSW Vector Search) and exact keyword matches (Sparse/BM25 Search).
 2. **Tree Collapse Search:** Because of the RAPTOR architecture, Qdrant searches the *entire* hierarchy simultaneously, from **Level 0 Leaf Nodes** (raw document chunks) to **Level 1, 2 or 3 Summary Nodes** (synthesized overviews).
 3. Qdrant returns the Top 20 results to the Vector DB tool. These results are returned as JSON objects containing the **Original Text Payload** and the **Metadata Array** (citations, page numbers, source docs).
 
+If the SQL tool is being used, it receives the results from the database as payload.
+
 #### Step 3: Context Assembly (Generating the Tool Observation)
 
-The Vector DB tool takes the Top 20 text payloads retrieved from Qdrant and injects them into a strict **System Prompt Template** in the Generation LLM's context window, via **vLLM** as follows:
+The tool takes the retrieved payloads and injects them into a strict **System Prompt Template** in the Generation LLM's context window, via **vLLM** as follows:
 ```text
 <|im_start|>system
 You are an expert enterprise AI assistant. You must answer the user's question using ONLY the provided context below. If the context does not contain the answer, say "I do not know." 
