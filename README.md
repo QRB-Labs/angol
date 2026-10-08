@@ -15,16 +15,17 @@ Runs locally on a NDVIDIA GDX Spark or less.
 - [Objective](#objective)
 - [Overview](#overview)
 - [Detailed Design](#detailed-design)
-  - [1. Ingestion & Parsing Layer](#1-ingestion--parsing-layer)
-  - [2. Chunking & Embedding Layer](#2-chunking--embedding-layer)
-  - [3. Clustering & Summarization (RAPTOR Pipeline)](#3-clustering--summarization-raptor-pipeline)
-  - [4. Storage Layer](#4-storage-layer)
-  - [5. Retrieval & Generation Layer](#5-retrieval--generation-layer)
+  - [1. Ingestion Layer](#1-ingestion-layer)
+    - [1.1 Parsing](#11-parsing)
+    - [1.2 Chunking & Embedding](#12-chunking--embedding)
+    - [1.3 Clustering & Summarization (RAPTOR Pipeline)](#13-clustering--summarization-raptor-pipeline)
+  - [2. Storage Layer](#2-storage-layer)
+  - [3. Serving Layer](#3-serving-layer)
     - [Step 1: Query translation](#step-1-query-translation)
-    - [Step 2: The RAPTOR Database Search (Fetching Context)](#step-2-the-raptor-database-search-fetching-context)
-    - [Step 3: Context Assembly (Generating the Tool Observation)](#step-3-context-assembly-generating-the-tool-observation)
+    - [Step 2: Retrieval](#step-2-retrieval)
+    - [Step 3: Context Assembly](#step-3-context-assembly)
     - [Step 4: Observation and Final Generation](#step-4-observation-and-final-generation)
-  - [6. User Interface](#6-user-interface)
+  - [4. User Interface](#4-user-interface)
 - [Quantitative Estimates](#quantitative-estimates)
 - [Design Alternatives](#design-alternatives)
 - [Notes](#notes)
@@ -38,28 +39,29 @@ The system utilizes an advanced Retrieval-Augmented Generation (RAG) architectur
 
 ## Detailed Design
 ![Angol Architecture](angol-architecture.png)
-### 1. Ingestion & Parsing Layer
+### 1. Ingestion Layer
+#### 1.1 Parsing
 *   **Document Extraction:** Uses IBM's [Docling](https://github.com/DS4SD/docling) or [Unstructured](https://unstructured.io/) to parse documents, including complex layouts and slide decks via specialized Vision/OCR models.
 *   **Spreadsheet Parsing:** Datasets from CSV or spreadsheet files are ingested into a local PostgreSQL database for Text-to-SQL agentic querying.
 *   **Metadata Tagging:** Every chunk is aggressively tagged with metadata (Author, Date, Department, Page Number, Document ID) to enable accurate citation generation down the pipeline.
 
-### 2. Chunking & Embedding Layer
+#### 1.2 Chunking & Embedding
 *   **Pipeline Management:** [LlamaIndex](https://www.llamaindex.ai/) manages chunking and RAG pipelines.
 *   **Chunking Strategy:** Semantic chunking targeting ~2KB of text (roughly 500 tokens) per chunk.
 *   **Embedding Model:** [BAAI BGE-M3](https://huggingface.co/BAAI/bge-m3). Handles massive context windows, supports multi-linguality, and generates dense vectors at 1024 dimensions.
 
-### 3. Clustering & Summarization (RAPTOR Pipeline)
+#### 1.3 Clustering & Summarization (RAPTOR Pipeline)
 To enable holistic reasoning across the corpus, data is grouped and summarized hierarchically:
 *   **Metadata Partitioning:** Vectors are first bucketed by metadata (e.g., Department, Year) into batches of 20,000 to 40,000 chunks to prevent memory overflow.
 *   **GPU Clustering:** [NVIDIA FAISS](https://github.com/facebookresearch/faiss) runs GPU-accelerated K-Means clustering on the buckets to group related chunks across different documents (with K=200 to 400 clusters per batch, maintaining a 100:1 compression ratio; lower ratio gains accuracy on small signals but costs more in ingestion time and run-time memory).
 *   **Summarization:** A dedicated Ingestion LLM (e.g. **Meta Llama-3.1-8B-Instruct** for English corpora) reads the concatenated text of each cluster and generates a comprehensive summary. This new summary text is then embedded and pushed back into the vector database, explicitly storing the source document citations of all underlying child nodes as metadata to preserve accurate lineage and attribution.
 *   **Recursion:** Summaries are clustered and summarized iteratively until a "Root Node" executive summary is reached.
 
-### 4. Storage Layer
+### 2. Storage Layer
 *   **Database:** [Qdrant](https://qdrant.tech/) or [Milvus](https://milvus.io/) for vector data, and PostgreSQL for tabular data, deployed locally via Docker.
 *   **Memory Optimization:** For vector data, use Scalar Quantization (Int8) to compress 32-bit floating-point vectors, coupled with memory-mapped (`mmap`) payload storage to keep raw text on the NVMe SSD and only the HNSW search index in System RAM.
 
-### 5. Retrieval & Generation Layer
+### 3. Serving Layer
 *   **Model Serving:** [vLLM](https://github.com/vllm-project/vllm) for high-throughput, memory-efficient LLM serving.
 *   **Router LLM:** [Qwen-2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) or [Meta Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct). Selected for high reasoning capabilities within constrained VRAM. Serves as the routing/reasoning engine for the Agent.
 *   **Generation LLM:** Generates observations from tool call results. Can be the same instance as the Router LLM.
@@ -76,7 +78,7 @@ If the vector tool is being used:
 
 If the SQL tool is being used, it generates an SQL query.
 
-#### Step 2: Database Search (Fetching Context)
+#### Step 2: Retrieval
 If vector tool is being used:
 1. **Hybrid Search:** Qdrant performs a hybrid search against the 40 Million vectors in RAM. It looks for both mathematical proximity (HNSW Vector Search) and exact keyword matches (Sparse/BM25 Search).
 2. **Tree Collapse Search:** Because of the RAPTOR architecture, Qdrant searches the *entire* hierarchy simultaneously, from **Level 0 Leaf Nodes** (raw document chunks) to **Level 1, 2 or 3 Summary Nodes** (synthesized overviews).
@@ -84,16 +86,15 @@ If vector tool is being used:
 
 If the SQL tool is being used, it receives the results from the database as payload.
 
-#### Step 3: Context Assembly (Generating the Tool Observation)
+#### Step 3: Context Assembly
 
 The Vector DB tool takes the Top 20 text payloads retrieved from Qdrant and injects them into a strict **System Prompt Template** in the Generation LLM's context window, via **vLLM**.  Because this LLM's only job at this stage is generating an observation for the ReAct Agent, the promptfocuses on exhaustive data extraction and metadata preservation:
-
-```text
+```
 <|im_start|>system
 You are an internal data extraction and synthesis assistant. Your job is to take raw context from the database and exhaustively extract all relevant information for the provided query.
 
 CRITICAL INSTRUCTIONS:
-1. Base your answer purely on the provided context. Do not use outside knowledge.
+1. ...
 2. ...
 
 --- CONTEXT ---
@@ -112,12 +113,12 @@ Summarize the supply chain risks in Europe for 2023.
 
 #### Step 4: Observation and Final Generation
 1. **Observation Generation:** The Generation LLM reads the fully assembled prompt. Because it is an Instruction-Tuned model (`-Instruct`), it strictly obeys the system prompt. It evaluates the competing facts in the provided context and generates an Observation for the agent.
-2. **Reasoning Loop:** The Routing/Reasoning Agent reads this Observation. It decides if this is enough information to fully answer the user's question. If not, it decides on another action (e.g., an additional tool call).
-3. **Final Output:** If the Routing/Reasoning Agent decides it has enough information, it generates the final answer and streams the text back to the User Interface, preserving the citations derived from the Observation (e.g., *"Supply chain risks increased by 14% [Report_2023.pdf, Page 42], however, automation offset these delays [Multi-Doc Summary Node]."*). 
+2. **Reasoning Loop:** The Agent reads this Observation. Using the Routing/Reasoning LLM, it decides if this is enough information to fully answer the user's question. If not, it decides on another action (e.g., an additional tool call).
+3. **Final Output:** If it decides it has enough information, it generates the final answer and streams the text back to the User Interface, preserving the citations derived from the Observation (e.g., *"Supply chain risks increased by 14% [Report_2023.pdf, Page 42], however, automation offset these delays [Multi-Doc Summary Node]."*). 
 
 * **Summary of the Interaction:** The Vector Database acts purely as an ultra-fast semantic filter. The Generation LLM purely gets results from the tools and generates an observation. **LlamaIndex manages the ReAct loop, using the Router LLM as the central reasoning engine** to decide which tools to call, evaluate their observations, and ultimately generate the final answer.
 
-### 6. User Interface
+### 4. User Interface
 *   **Frontend:** [Open WebUI](https://github.com/open-webui/open-webui). Provides a ChatGPT-like interface with built-in citation rendering and document snippet viewing.
 
 ## Quantitative Estimates
