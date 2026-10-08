@@ -20,7 +20,7 @@ Runs locally on a NDVIDIA GDX Spark or less.
   - [3. Clustering & Summarization (RAPTOR Pipeline)](#3-clustering--summarization-raptor-pipeline)
   - [4. Storage Layer](#4-storage-layer)
   - [5. Retrieval & Generation Layer](#5-retrieval--generation-layer)
-    - [Step 1: Query Vectorization (The translation)](#step-1-query-vectorization-the-translation)
+    - [Step 1: Query translation](#step-1-query-translation)
     - [Step 2: The RAPTOR Database Search (Fetching Context)](#step-2-the-raptor-database-search-fetching-context)
     - [Step 3: Context Assembly (Generating the Tool Observation)](#step-3-context-assembly-generating-the-tool-observation)
     - [Step 4: Observation and Final Generation](#step-4-observation-and-final-generation)
@@ -76,7 +76,7 @@ If the vector tool is being used:
 
 If the SQL tool is being used, it generates an SQL query.
 
-#### Step 2: The RAPTOR Database Search (Fetching Context)
+#### Step 2: Database Search (Fetching Context)
 If vector tool is being used:
 1. **Hybrid Search:** Qdrant performs a hybrid search against the 40 Million vectors in RAM. It looks for both mathematical proximity (HNSW Vector Search) and exact keyword matches (Sparse/BM25 Search).
 2. **Tree Collapse Search:** Because of the RAPTOR architecture, Qdrant searches the *entire* hierarchy simultaneously, from **Level 0 Leaf Nodes** (raw document chunks) to **Level 1, 2 or 3 Summary Nodes** (synthesized overviews).
@@ -86,18 +86,21 @@ If the SQL tool is being used, it receives the results from the database as payl
 
 #### Step 3: Context Assembly (Generating the Tool Observation)
 
-The tool takes the retrieved payloads and injects them into a strict **System Prompt Template** in the Generation LLM's context window, via **vLLM** as follows:
+The Vector DB tool takes the Top 20 text payloads retrieved from Qdrant and injects them into a strict **System Prompt Template** in the Generation LLM's context window, via **vLLM**.  Because this LLM's only job at this stage is generating an observation for the ReAct Agent, the promptfocuses on exhaustive data extraction and metadata preservation:
+
 ```text
 <|im_start|>system
-You are an expert enterprise AI assistant. You must answer the user's question using ONLY the provided context below. If the context does not contain the answer, say "I do not know." 
+You are an internal data extraction and synthesis assistant. Your job is to take raw context from the database and exhaustively extract all relevant information for the provided query.
 
-For every claim you make, you MUST append an inline citation using the exact [Doc_ID, Page] provided in the context.
+CRITICAL INSTRUCTIONS:
+1. Base your answer purely on the provided context. Do not use outside knowledge.
+2. ...
 
 --- CONTEXT ---
-[Doc_ID: Report_2023.pdf, Page: 42, Source_Level: 0]
+[file_name: Report_2023.pdf, Page: 42, raptor_level: 0]
 Text: "European supply chain risks increased by 14% due to delayed customs processing..."
 
-[Doc_ID: Multi-Doc Summary Node, Sources: (Logistics_Q1.pdf, Logistics_Q2.pdf), Source_Level: 2]
+[file_name: Multi-Doc Summary Node, child_citations: (Logistics_Q1.pdf), raptor_level: 2]
 Text: "Over the course of 2023, automated warehouse rollouts offset regional freight delays..."
 --- END CONTEXT ---
 <|im_end|>
@@ -106,6 +109,7 @@ Summarize the supply chain risks in Europe for 2023.
 <|im_end|>
 <|im_start|>assistant
 ```
+
 #### Step 4: Observation and Final Generation
 1. **Observation Generation:** The Generation LLM reads the fully assembled prompt. Because it is an Instruction-Tuned model (`-Instruct`), it strictly obeys the system prompt. It evaluates the competing facts in the provided context and generates an Observation for the agent.
 2. **Reasoning Loop:** The Routing/Reasoning Agent reads this Observation. It decides if this is enough information to fully answer the user's question. If not, it decides on another action (e.g., an additional tool call).
