@@ -16,7 +16,7 @@ llama-index-llms-openai-like
 # 3. Vector DB & Clustering (RAPTOR)
 # ==========================================
 qdrant-client                        # Qdrant python driver
-faiss-gpu-cu12                       # Using modern CUDA 12 wheel for pip stability
+faiss-cpu                            # CPU version for FAISS clustering
 numpy                                # Standard math arrays (used heavily by FAISS)
 
 # ==========================================

@@ -45,7 +45,7 @@ httpx_logger.setLevel(logging.DEBUG)
 
 # 1. The Generation LLM
 generation_llm = OpenAILike(
-    api_base="http://localhost:8000/v1",
+    api_base=os.getenv("OPENAI_API_BASE", "http://localhost:8000/v1"),
     api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
     model=os.getenv("GENERATION_MODEL"),
     system_prompt=GENERATION_SYSTEM_PROMPT,
@@ -57,7 +57,7 @@ generation_llm = OpenAILike(
 
 # 2. The Router LLM
 router_llm = OpenAILike(
-    api_base="http://localhost:8000/v1",
+    api_base=os.getenv("OPENAI_API_BASE", "http://localhost:8000/v1"),
     api_key=os.getenv("OPENAI_API_KEY", "fake-key"),
     model=os.getenv("GENERATION_MODEL"),
     is_chat_model=True,

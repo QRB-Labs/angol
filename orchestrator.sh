@@ -16,12 +16,12 @@ fi
 VENV_PYTHON="${PROJECT_DIR}/angol_env/bin/python"
 VENV_UVICORN="${PROJECT_DIR}/angol_env/bin/uvicorn"
 
-wait_for_vllm() {
-    echo "Waiting for vLLM to be ready on port 8000..."
-    while ! curl -s http://localhost:8000/v1/models > /dev/null; do
+wait_for_ollama() {
+    echo "Waiting for Ollama to be ready on port 11434..."
+    while ! curl -s http://localhost:11434/v1/models > /dev/null; do
 	sleep 5
     done
-    echo "vLLM is up and ready!"
+    echo "Ollama is up and ready!"
 }
 
 RAW_DIR="${PROJECT_DIR}/data/raw_documents/"
@@ -36,33 +36,33 @@ if [ -n "$(find "$RAW_DIR" -type f | head -1)" ]; then
 
     # 1. Kill Serving LLM and FastAPI Middleware
     echo "Shutting down Generation Model and Middleware..."
-    docker stop vllm-model 2>/dev/null
-    docker rm vllm-model 2>/dev/null
+    docker stop ollama-model 2>/dev/null
+    docker rm ollama-model 2>/dev/null
     pkill -f "serving.serve_api:app"
-    sleep 10 # Allow VRAM to clear completely
+    sleep 10 # Allow RAM to clear completely
 
     # 2. Start Ingestion LLM for RAPTOR Summarization
-    echo "Loading ${INGESTION_MODEL} into VRAM via Docker..."
-    docker run -d --name vllm-model --gpus all \
+    echo "Loading ${INGESTION_MODEL} into RAM via Docker..."
+    docker run -d --name ollama-model \
 	--env-file "${PROJECT_DIR}/.env" \
-	-p 8000:8000 \
-	-v ~/.cache/huggingface:/root/.cache/huggingface \
-	--ipc=host \
-	vllm/vllm-openai:latest \
-	--model ${INGESTION_MODEL} \
-	--max-model-len 8192 \
-	--gpu-memory-utilization 0.50
+	-p 11434:11434 \
+	-v ~/.ollama:/root/.ollama \
+	ollama/ollama:latest
 
-    wait_for_vllm
+    wait_for_ollama
+    
+    echo "Starting model ${INGESTION_MODEL}..."
+    docker exec -d ollama-model ollama run ${INGESTION_MODEL}
+    sleep 10
 
     # 3. Run the RAPTOR Ingestion Pipeline
     echo "Running RAPTOR Clustering & Parsing..."
     $VENV_PYTHON ingestion/ingestion_pipeline.py --raw-dir "$RAW_DIR" --processed-dir "${PROJECT_DIR}/data/processed_documents/"
 
-    # 4. Unload Ingestion LLM from VRAM
+    # 4. Unload Ingestion LLM from RAM
     echo "Unloading Ingestion Model..."
-    docker stop vllm-model
-    docker rm vllm-model
+    docker stop ollama-model
+    docker rm ollama-model
     sleep 10
 else
     echo "No new files found in ${RAW_DIR}. Skipping ingestion pipeline."
@@ -74,29 +74,28 @@ fi
 
 # 5. Start generation LLM (if not already running)
 # We hit the API to see if it is responding AND if the currently loaded model is the GENERATION_MODEL
-if curl -s http://localhost:8000/v1/models | grep -q "${GENERATION_MODEL}"; then
+if curl -s http://localhost:11434/v1/models | grep -q "${GENERATION_MODEL}"; then
     echo "Generation Model (${GENERATION_MODEL}) is already loaded and running."
 else
     echo "Generation Model is not running or incorrect model is loaded. Starting..."
 
     # Ensure any stuck/incorrect containers are killed before starting
-    docker stop vllm-model 2>/dev/null
-    docker rm vllm-model 2>/dev/null
+    docker stop ollama-model 2>/dev/null
+    docker rm ollama-model 2>/dev/null
     sleep 5
 
-    echo "Loading ${GENERATION_MODEL} into VRAM via Docker..."
-    docker run -d --name vllm-model --gpus all \
+    echo "Loading ${GENERATION_MODEL} into RAM via Docker..."
+    docker run -d --name ollama-model \
 	--env-file "${PROJECT_DIR}/.env" \
-	-p 8000:8000 \
-	-v ~/.cache/huggingface:/root/.cache/huggingface \
-	--ipc=host \
-	vllm/vllm-openai:latest \
-	--model ${GENERATION_MODEL} \
-	--max-model-len ${GENERATION_MODEL_MAX_LEN} \
-	--gpu-memory-utilization 0.80 \
-	$GENERATION_EXTRA_FLAGS
+	-p 11434:11434 \
+	-v ~/.ollama:/root/.ollama \
+	ollama/ollama:latest
 
-    wait_for_vllm
+    wait_for_ollama
+    
+    echo "Starting model ${GENERATION_MODEL}..."
+    docker exec -d ollama-model ollama run ${GENERATION_MODEL}
+    sleep 10
 fi
 
 # 6. Start FastAPI Middleware (if not already running)
