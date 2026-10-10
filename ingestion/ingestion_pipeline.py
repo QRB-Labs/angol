@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Assuming an average chunk (node) size of ~2KB (~500 tokens),
 # 500,000 nodes equates to roughly 1GB of raw text per bucket.
 CHUNK_SIZE = 500
-NODES_PER_BUCKET = 500000
+NODES_PER_BUCKET = 50000
 
 def main(raw_dir, processed_dir):
     os.makedirs(processed_dir, exist_ok=True)

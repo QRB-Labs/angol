@@ -16,8 +16,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-VLLM_API_BASE = os.getenv("VLLM_API_BASE", "http://localhost:8000/v1")
-llm_client = OpenAI(base_url=VLLM_API_BASE, api_key="local")
+OPENAI_API_BASE = os.getenv("OPENAI_API_BASE", "http://localhost:11434/v1")
+llm_client = OpenAI(base_url=OPENAI_API_BASE, api_key="local")
 MODEL_NAME = os.getenv("INGESTION_MODEL", "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4")
 
 MAX_TOKENS_PER_CLUSTER = 6000
@@ -25,7 +25,7 @@ CHUNK_SIZE_ESTIMATE = 500
 
 def perform_clustering(embeddings: np.ndarray, num_clusters: int) -> np.ndarray:
     d = embeddings.shape[1]
-    kmeans = faiss.Kmeans(d=d, k=num_clusters, niter=20, verbose=False, gpu=True)
+    kmeans = faiss.Kmeans(d=d, k=num_clusters, niter=20, verbose=False)
     kmeans.train(embeddings)
     _, labels = kmeans.index.search(embeddings, 1)
     return labels.flatten()
@@ -157,7 +157,7 @@ def run_faiss_clustering_and_summarize(db_client, embed_model, unique_buckets, c
             new_summary_nodes = []
 
             logger.info(f"Sending {len(clusters)} clusters to {MODEL_NAME}...")
-            with ThreadPoolExecutor(max_workers=10) as executor:
+            with ThreadPoolExecutor(max_workers=1) as executor:
                 future_to_cluster = {
                     executor.submit(summarize_cluster, nodes, next_level): nodes
                     for label, nodes in clusters.items() if len(nodes) > 0
