@@ -22,13 +22,14 @@ See the file [.env](.env).
 	*  `HF_TOKEN` is an access token from https://huggingface.co/settings/tokens. Even though we use open-soure, open-weight models, in some cases they offer higher speed download (BGE-M3) or impose access terms (Llama-3.1-8B) via the Hugging Face token.
     *  `OPENAI_API_KEY` is purely a local dummy key required by the client library to talk to the local vLLM server. It is not used for external API calls and can be set to any arbitrary value.
 
-*   **NVIDIA Host Drivers & Docker Toolkit (Required for GPU Access):**
-Ensure the host OS can see the GPU and install the toolkit required to pass it into Docker containers.
+*   **NVIDIA Host Drivers, Docker & Toolkit (Required for GPU Access):**
+Ensure the host OS can see the GPU, install Docker, and configure the toolkit required to pass it into Docker containers.
 
 ```bash
 	sudo apt-get update
-	sudo apt-get install -y ubuntu-drivers-common
+	sudo apt-get install -y ubuntu-drivers-common docker.io docker-compose-v2
 	sudo ubuntu-drivers autoinstall
+	sudo usermod -aG docker $USER
 	sudo reboot
 	curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
 	curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
