@@ -220,3 +220,4 @@ curl -X POST 'http://localhost:6333/collections/angol/points/delete' \
 1. UI: render citations in responses with links (to processed_documents?)
 1. **Image Captioning**: During the Docling parsing script, whenever an image or chart is detected, pass that cropped image to a local Vision-Language Model (VLM) like **Qwen2-VL-7B** or **Llama-3.2-11B-Vision**. You prompt the VLM: *"Describe this chart and its trends in detail."* 
 You then inject that generated paragraph directly into the Markdown document. This guarantees that deep, visual insights are securely captured in your text-based Vector database!
+1. Add intelligence to Pandas ingestion to better guess table and column names from content.
