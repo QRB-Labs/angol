@@ -104,9 +104,15 @@ def main(raw_dir, processed_dir):
 
     # 5. Parse and Process Documents into Qdrant
     unique_buckets = set()
-    total_nodes_processed = 0
-
+    nodes_per_bucket = {} 
+    
     for doc in extract_markdown(raw_dir):
+        file_name = doc.metadata.get('file_name')
+        file_path = doc.metadata.get('file_path')
+        file_path = file_path or (os.path.join(raw_dir, file_name) if file_name else raw_dir)
+        rel_path = os.path.relpath(os.path.dirname(file_path), raw_dir)
+        bucket_name_pref = "bucket" if rel_path == "." else rel_path
+
         nodes = splitter.get_nodes_from_documents([doc])
 
         # Inject RAPTOR Metadata and Deterministic IDs
@@ -114,10 +120,11 @@ def main(raw_dir, processed_dir):
             node.id_ = hashlib.md5(node.get_content().encode("utf-8")).hexdigest()
             node.metadata["raptor_level"] = 0
             node.metadata["ingestion_datetime"] = ingestion_datetime
-            bucket_name = f"bucket_{total_nodes_processed // NODES_PER_BUCKET}"
+            current_count = nodes_per_bucket.get(bucket_name_pref, 0)
+            bucket_name = f"{bucket_name_pref}_{current_count // NODES_PER_BUCKET}"
             node.metadata["bucket"] = bucket_name
             unique_buckets.add(bucket_name)
-            total_nodes_processed += 1
+            nodes_per_bucket[bucket_name_pref] = current_count + 1
 
         # Upsert this document's nodes immediately, clearing them from memory
         if nodes:
@@ -125,17 +132,14 @@ def main(raw_dir, processed_dir):
             logger.info(f"Upserted {len(nodes)} nodes from {doc.metadata.get('file_name', 'unknown')}.")
 
             # Move the processed document immediately
-            file_name = doc.metadata.get('file_name')
-            file_path = doc.metadata.get('file_path')
-            target_path = file_path if file_path else (os.path.join(raw_dir, file_name) if file_name else None)
-            
-            if target_path and os.path.exists(target_path):
+            if file_path and os.path.isfile(file_path):
                 try:
-                    shutil.move(target_path, os.path.join(processed_dir, os.path.basename(target_path)))
-                    logger.info(f"Moved processed file {target_path}")
+                    shutil.move(file_path, os.path.join(processed_dir, os.path.basename(file_path)))
+                    logger.info(f"Moved processed file {file_path}")
                 except Exception as e:
-                    logger.error(f"Failed to move {target_path}: {e}")
+                    logger.error(f"Failed to move {file_path}: {e}")
 
+    total_nodes_processed = sum(nodes_per_bucket.values())
     logger.info(f"Pushed {total_nodes_processed} Level 0 nodes to Qdrant.")
 
     # 6. Run RAPTOR Pipeline (100:1 Compression)
