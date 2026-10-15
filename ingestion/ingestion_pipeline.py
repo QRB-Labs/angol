@@ -110,7 +110,7 @@ def main(raw_dir, processed_dir):
         file_name = doc.metadata.get('file_name')
         file_path = doc.metadata.get('file_path')
         file_path = file_path or (os.path.join(raw_dir, file_name) if file_name else raw_dir)
-        rel_path = os.path.relpath(os.path.dirname(file_path), raw_dir)
+        rel_path = os.path.relpath(os.path.dirname(file_path), raw_dir).split(os.sep)[0]
         bucket_name_pref = "bucket" if rel_path == "." else rel_path
 
         nodes = splitter.get_nodes_from_documents([doc])
