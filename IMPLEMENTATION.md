@@ -97,8 +97,9 @@ This phase is executed by a heavy Python script run by the orchestrator while th
 	*   Embed all chunks (Level 0 Leaf Nodes).
 4. **Recursive RAPTOR Clustering ([`ingestion/raptor_clustering.py`](ingestion/raptor_clustering.py)):**
 	Instead of a flat pass, the pipeline recursively builds a hierarchical semantic tree (up to `max_levels`).
-	* **Loop Levels:** Starting at `raptor_level=0` (leaf nodes), the system fetches vectors bucket-by-bucket to respect the 128GB RAM limit.
-	* **Cluster:** FAISS K-Means groups semantically similar chunks within the current bucket and level.
+	* **Buckets**: Each chunk is in a "bucket". A bucket contains all the Level 0 chunks that will be considered together for clustering at Level 1. Buckets are used for semantic grouping as well as for memory management. Documents in the root folder default to `bucket_0`. If that bucket reaches `NODES_PER_BUCKET` within a single ingestion run, the chunks overflow into buckets named `bucket_1, bucket_2, ...` You can assign chunks to different buckets by placing the source data in subdirectories of the raw documents directory. E.g., a file in `raw_documents/finance/2023/` gets assigned to the `finance_0` bucket and if that gets to full to `finance_1`, etc. 
+	* **Loop Levels:** Starting at `raptor_level=0` (leaf nodes), the system fetches vectors bucket-by-bucket.
+	* **Cluster:** FAISS K-Means clusters semantically similar chunks within the current bucket and level.
 	* **Summarize:** The ingestion LLM (via vLLM) synthesizes each cluster into a summary node, inheriting deduplicated `child_citations`.
 	* **Re-Embed:** Summaries are embedded (BGE-M3) and upserted to Qdrant tagged as `raptor_level = current_level + 1`.
 	* **Recurse:** The process repeats on the newly generated summary nodes until the tree root is reached or node counts fall below the clustering threshold.
