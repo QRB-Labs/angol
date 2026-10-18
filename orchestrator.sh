@@ -31,7 +31,7 @@ RAW_DIR="${PROJECT_DIR}/data/raw_documents/"
 # ==========================================
 
 # Check if there are any files in the raw_documents directory
-if [ -n "$(find "$RAW_DIR" -type f | head -1)" ]; then
+if [ -n "$(find "$RAW_DIR" -type f -print -quit)" ]; then
     echo "New documents detected in ${RAW_DIR}. Initiating Ingestion Pipeline..."
 
     # 1. Kill Serving LLM and FastAPI Middleware
