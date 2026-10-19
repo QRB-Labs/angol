@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -28,9 +30,15 @@ PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DB = os.getenv("POSTGRES_DB", "angol_db")
 
+GENERATION_MODEL_MAX_LEN = int(os.getenv("GENERATION_MODEL_MAX_LEN", "32768"))
+MAX_RESULT_CHARS = GENERATION_MODEL_MAX_LEN // 4  # ~8,192 chars (approx 2,048 tokens)
+
 llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 Settings.callback_manager = CallbackManager([llama_debug])
+# logging.getLogger("llama_index.core").setLevel(logging.DEBUG)
+# logging.getLogger("llama_index.llms").setLevel(logging.DEBUG)
 
+logger = logging.getLogger(__name__)
 
 class SafeQueryEngineWrapper(CustomQueryEngine):
     query_engine: BaseQueryEngine
@@ -38,15 +46,19 @@ class SafeQueryEngineWrapper(CustomQueryEngine):
 
     def custom_query(self, query_str: str):
         try:
-            return self.query_engine.query(query_str)
+            response = self.query_engine.query(query_str)
+            if hasattr(response, "metadata") and response.metadata and "result" in response.metadata:
+                if len(str(response.metadata["result"])) > MAX_RESULT_CHARS:
+                    response.metadata["result"] = f"{str(response.metadata['result'])[:MAX_RESULT_CHARS]}... [TRUNCATED]"
+            if not response.response or not str(response.response).strip():
+                logger.error("LLM returned an empty response. Check vLLM for max-token-len limits.")
+                return Response(response="[System: The model failed to generate a response, likely due to context size limits.]")
+            return response
         except Exception as e:
             return Response(response=f"Tool error: {str(e)}. {self.fallback_message}")
 
     async def acustom_query(self, query_str: str):
-        try:
-            return await self.query_engine.aquery(query_str)
-        except Exception as e:
-            return Response(response=f"Tool error: {str(e)}. {self.fallback_message}")
+        return await asyncio.to_thread(self.custom_query, query_str)
 
 
 def get_vector_tool(llm):
@@ -64,7 +76,7 @@ def get_vector_tool(llm):
     query_engine = index.as_query_engine(
         llm=llm,
         similarity_top_k=VECTOR_TOP_K,
-        response_mode="tree_summarize"  # Synthesize in chunks if context too large
+        response_mode="compact"
     )
     
     safe_query_engine = SafeQueryEngineWrapper(
@@ -81,10 +93,18 @@ def get_vector_tool(llm):
     )
 
 
+class SafeSQLDatabase(SQLDatabase):
+    def run_sql(self, command: str):
+        result_str, metadata = super().run_sql(command)
+        if len(result_str) > MAX_RESULT_CHARS:
+            result_str = f"{result_str[:MAX_RESULT_CHARS]}... [RESULT TRUNCATED]"
+        return result_str, metadata
+
+
 def get_sql_tool(llm):
     db_uri = f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}"
     engine = create_engine(db_uri)
-    sql_database = SQLDatabase(engine)
+    sql_database = SafeSQLDatabase(engine)
     
     query_engine = NLSQLTableQueryEngine(
         sql_database=sql_database,
