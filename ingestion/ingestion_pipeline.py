@@ -27,7 +27,7 @@ NODES_PER_BUCKET = 500000
 
 def main(raw_dir, processed_dir):
     os.makedirs(processed_dir, exist_ok=True)
-    
+
     # Generate ISO 8601 timestamp string for this ingestion run
     ingestion_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -50,7 +50,7 @@ def main(raw_dir, processed_dir):
 
     # 3. Setup Chunking, chunk size ~500 tokens
     splitter = SentenceSplitter(
-        chunk_size=CHUNK_SIZE,  
+        chunk_size=CHUNK_SIZE,
         chunk_overlap = 50
     )
 
@@ -104,8 +104,8 @@ def main(raw_dir, processed_dir):
 
     # 5. Parse and Process Documents into Qdrant
     unique_buckets = set()
-    nodes_per_bucket = {} 
-    
+    nodes_per_bucket = {}
+
     for doc in extract_markdown(raw_dir):
         file_name = doc.metadata.get('file_name')
         file_path = doc.metadata.get('file_path')
@@ -145,12 +145,14 @@ def main(raw_dir, processed_dir):
     # 6. Run RAPTOR Pipeline (100:1 Compression)
     # This function uses FAISS to cluster, then calls the ingestion LLM
     # to summarize, then embeds the summaries and pushes to Qdrant.
-    run_faiss_clustering_and_summarize(
-        db_client=db_client,
-        embed_model=embed_model,
-        unique_buckets=list(unique_buckets),
-        collection_name="angol"
-    )
+    if total_nodes_processed > 0:
+        run_faiss_clustering_and_summarize(
+            db_client=db_client,
+            embed_model=embed_model,
+            unique_buckets=list(unique_buckets),
+            collection_name="angol"
+        )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Angol RAPTOR Ingestion Pipeline.")
