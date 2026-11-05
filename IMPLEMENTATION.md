@@ -44,14 +44,48 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 	sudo apt-get update
 	sudo apt-get install tesseract-ocr poppler-utils libgl1 libglib2.0-0
 ```
+*   **Python Virtual Environment:** 
+Depending on your system's CPU architecture, you must use either a standard `venv` or Conda. You can check your architecture by running `uname -m`.
 
-*   **Python Virtual Environment:** Load python [requirements.txt](requirements.txt) in a separate python environment to avoid conflict with existing packages.
-
+    **Option A: Standard Systems (x86_64 / GCP / AWS / Intel / AMD)**
+    Standard PyPI provides pre-compiled CUDA wheels for x86_64, allowing us to use a standard Python virtual environment without Conda.
 ```bash
-	sudo apt install python3.10-venv
-	python3.10 -m venv angol_env
-	source angol_env/bin/activate
-	pip install -r requirements.txt
+        # 1. Install Python 3.10 and venv modules (for Ubuntu 22.04)
+        sudo apt-get update
+        sudo apt-get install -y python3.10 python3.10-venv python3.10-dev
+
+        # 2. Create and activate the environment locally in the project directory
+        python3.10 -m venv angol_env
+        source angol_env/bin/activate
+
+        # 3. Install dependencies directly via pip 
+        # (Ensure faiss-gpu-cu12 is NOT commented out in requirements.txt)
+        pip install --upgrade pip wheel setuptools
+        pip install -r requirements.txt
+```
+
+    **Option B: ARM64 / DGX Systems (e.g., NVIDIA Grace Hopper)**
+    Because standard PyPI does not provide compiled CUDA wheels for ARM64 architectures, we must use Miniforge (Conda-Forge) to install `faiss-gpu` natively, while safely managing the rest of the dependencies in pip.
+```bash
+        # 1. Download and install Miniforge for ARM64
+        curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh"
+        bash Miniforge3-Linux-aarch64.sh -b -p $HOME/miniforge3
+        source $HOME/miniforge3/bin/activate
+        conda init
+        source ~/.bashrc
+        rm Miniforge3-Linux-aarch64.sh
+
+        # 2. Create the Python 3.10 environment locally in the project directory
+        conda create -p ./angol_env python=3.10 -y
+        conda activate ./angol_env
+
+        # 3. Install GPU FAISS compiled for ARM64 + CUDA 12 via Conda
+        conda install -c conda-forge "faiss-gpu>=1.8" "cuda-version>=12.0" -y
+
+        # 4. Modify requirements and install via Pip
+        sed -i 's/^faiss-gpu-cu12/#faiss-gpu-cu12/' requirements.txt
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+        pip install -r requirements.txt
 ```
 
 **2. Infrastructure (Docker Compose)**

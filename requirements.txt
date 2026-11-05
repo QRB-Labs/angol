@@ -11,12 +11,14 @@ llama-index-embeddings-huggingface   # For local BGE-M3 embedding initialization
 llama-index-vector-stores-qdrant     # For connecting LlamaIndex to Qdrant
 llama-index-llms-openai              # Contains OpenAILike (used to connect to local vLLM)
 llama-index-llms-openai-like
+transformers==4.46.3            # Pinned to prevent PyTorch >= 2.6 crash on ARM64
+sentence-transformers==3.2.1    # Pinned to match transformers 4.46.3
 
 # ==========================================
 # 3. Vector DB & Clustering (RAPTOR)
 # ==========================================
 qdrant-client                        # Qdrant python driver
-faiss-gpu-cu12                       # Using modern CUDA 12 wheel for pip stability
+#faiss-gpu-cu12                       # Using modern CUDA 12 wheel for pip stability
 numpy                                # Standard math arrays (used heavily by FAISS)
 
 # ==========================================
