@@ -33,17 +33,17 @@ services:
 
   vllm-embeddings:
     image: vllm/vllm-openai:latest
+    command: ["--model", "BAAI/bge-m3", "--gpu-memory-utilization", "0.10"] 
     restart: always
     ports:
       - "8002:8000"
-    command: --model BAAI/bge-m3 --task embed
     volumes:
       # Maps your local HF cache so it doesn't re-download the model on restart
       - ~/.cache/huggingface:/root/.cache/huggingface
     deploy:
       resources:
-	reservations:
-	  devices:
-	    - driver: nvidia
-	      count: all
-	      capabilities: [gpu]
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
