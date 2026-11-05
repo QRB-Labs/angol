@@ -33,7 +33,7 @@ services:
 
   vllm-embeddings:
     image: vllm/vllm-openai:latest
-    command: ["--model", "BAAI/bge-m3", "--gpu-memory-utilization", "0.10"] 
+    command: ["--model", "BAAI/bge-m3", "--served-model-name", "text-embedding-3-small", "--gpu-memory-utilization", "0.10"] 
     restart: always
     ports:
       - "8002:8000"

@@ -66,7 +66,7 @@ def get_vector_tool(llm):
     aclient = qdrant_client.AsyncQdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
     vector_store = QdrantVectorStore(client=client, aclient=aclient, collection_name=QDRANT_COLLECTION)
     
-    embed_model = OpenAIEmbedding(model="BAAI/bge-m3", api_base="http://localhost:8002/v1", api_key="sk-dummy-key")
+    embed_model = OpenAIEmbedding(model="text-embedding-3-small", api_base="http://localhost:8002/v1", api_key="sk-dummy-key")
     
     index = VectorStoreIndex.from_vector_store(
         vector_store=vector_store,

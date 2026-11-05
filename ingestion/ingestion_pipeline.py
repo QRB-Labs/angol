@@ -31,8 +31,8 @@ def main(raw_dir, processed_dir):
     # Generate ISO 8601 timestamp string for this ingestion run
     ingestion_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # 1. Initialize BGE-M3 Locally
-    embed_model = OpenAIEmbedding(model="BAAI/bge-m3", api_base="http://localhost:8002/v1", api_key="sk-dummy-key")
+    # 1. Initialize BGE-M3 Locally (Using OpenAI alias trick for strict client validation)
+    embed_model = OpenAIEmbedding(model="text-embedding-3-small", api_base="http://localhost:8002/v1", api_key="sk-dummy-key")
     db_client = qdrant_client.QdrantClient(host="localhost", port=6333)
 
     # 2. Configure LlamaIndex to talk to Qdrant
