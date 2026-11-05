@@ -13,7 +13,7 @@ from raptor_clustering import run_faiss_clustering_and_summarize
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import SentenceSplitter
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.openai import OpenAIEmbedding
 import qdrant_client
 
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +32,7 @@ def main(raw_dir, processed_dir):
     ingestion_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # 1. Initialize BGE-M3 Locally
-    embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", token=os.getenv("HF_TOKEN"))
+    embed_model = OpenAIEmbedding(model="BAAI/bge-m3", api_base="http://localhost:8002/v1", api_key="sk-dummy-key")
     db_client = qdrant_client.QdrantClient(host="localhost", port=6333)
 
     # 2. Configure LlamaIndex to talk to Qdrant
