@@ -46,7 +46,6 @@ Ensure the host OS can see the GPU and install the toolkit required to pass it i
 ```
 *   **Python Virtual Environment:** 
 Depending on your system's CPU architecture, you must use either a standard `venv` or Conda. You can check your architecture by running `uname -m`.
-
     **Option A: Standard Systems (x86_64 / GCP / AWS / Intel / AMD)**
     Standard PyPI provides pre-compiled CUDA wheels for x86_64, allowing us to use a standard Python virtual environment without Conda.
 ```bash
@@ -63,7 +62,6 @@ Depending on your system's CPU architecture, you must use either a standard `ven
         pip install --upgrade pip wheel setuptools
         pip install -r requirements.txt
 ```
-
     **Option B: ARM64 / DGX Systems (e.g., NVIDIA Grace Hopper)**
     Because standard PyPI does not provide compiled CUDA wheels for ARM64 architectures, we must use Miniforge (Conda-Forge) to install `faiss-gpu` natively, while safely managing the rest of the dependencies in pip.
 ```bash
@@ -90,7 +88,7 @@ Depending on your system's CPU architecture, you must use either a standard `ven
 
 **2. Infrastructure (Docker Compose)**
 
-[`docker-compose.yml`](docker-compose.yml) spins up the three services that will start on boot:  Qdrant (Vector DB), PostgreSQL (Spreadsheet DB) and Open WebUI. 
+[`docker-compose.yml`](docker-compose.yml) spins up the four services that will start on boot:  Qdrant (Vector DB), PostgreSQL (Spreadsheet DB), Open WebUI, and vllm-embeddings (vLLM container serving BAAI/bge-m3).
 *   **Command:** `docker compose up -d`
 *   *Note on Qdrant Config:* Ensure the Qdrant volume is mapped to a fast NVMe SSD path, and configure the payload storage to `mmap: true` and vectors to `quantization: int8`.
 
@@ -127,7 +125,7 @@ This phase is executed by a heavy Python script run by the orchestrator while th
 2.  **SQL Routing (Spreadsheets):** If a file is a massive CSV/XLSX, use `pandas` to write it directly to the local PostgreSQL database using `psycopg2`.
 3.  **Chunk & Embed:**
 	*   Pass the parsed Markdown to LlamaIndex's `SemanticSplitterNodeParser`.
-	*   Load the embedding model locally: `embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3")`.
+	*   Connect to the local vLLM embedding container: `embed_model = OpenAIEmbedding(model="BAAI/bge-m3", api_base="http://localhost:8002/v1", api_key="sk-dummy-key")`.
 	*   Embed all chunks (Level 0 Leaf Nodes).
 4. **Recursive RAPTOR Clustering ([`ingestion/raptor_clustering.py`](ingestion/raptor_clustering.py)):**
 	Instead of a flat pass, the pipeline recursively builds a hierarchical semantic tree (up to `max_levels`).
