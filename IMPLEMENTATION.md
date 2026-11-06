@@ -62,7 +62,7 @@ Depending on your system's CPU architecture, you must use either a standard `ven
     # (Ensure faiss-gpu-cu12 is NOT commented out in requirements.txt)
     pip install --upgrade pip wheel setuptools
     pip install -r requirements.txt
-    
+    ```
 
     **Option B: ARM64 / DGX Systems (e.g., NVIDIA Grace Hopper)**
     Because standard PyPI does not provide compiled CUDA wheels for ARM64 architectures, we must use Miniforge (Conda-Forge) to install `faiss-gpu` natively, while safely managing the rest of the dependencies in pip.
@@ -86,6 +86,7 @@ Depending on your system's CPU architecture, you must use either a standard `ven
     sed -i 's/^faiss-gpu-cu12/#faiss-gpu-cu12/' requirements.txt
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
     pip install -r requirements.txt
+	```
 
 **2. Infrastructure (Docker Compose)**
 
