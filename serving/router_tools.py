@@ -10,7 +10,7 @@ from llama_index.core.query_engine import NLSQLTableQueryEngine
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import VectorStoreIndex
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.base.response.schema import Response
 from llama_index.core.query_engine import CustomQueryEngine
 from llama_index.core.base.base_query_engine import BaseQueryEngine
@@ -66,7 +66,7 @@ def get_vector_tool(llm):
     aclient = qdrant_client.AsyncQdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
     vector_store = QdrantVectorStore(client=client, aclient=aclient, collection_name=QDRANT_COLLECTION)
     
-    embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", token=os.getenv("HF_TOKEN"))
+    embed_model = OpenAIEmbedding(model="text-embedding-3-small", api_base="http://localhost:8002/v1", api_key="sk-dummy-key")
     
     index = VectorStoreIndex.from_vector_store(
         vector_store=vector_store,
