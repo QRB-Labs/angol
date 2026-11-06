@@ -12,12 +12,8 @@ llama-index-vector-stores-qdrant     # For connecting LlamaIndex to Qdrant
 llama-index-llms-openai              # Contains OpenAILike (used to connect to local vLLM)
 llama-index-llms-openai-like
 
-# Explicitly leash pip so it doesn't pull PyTorch 2.6+ on ARM64
-torch<2.6.0
-torchvision<0.21.0
-
-# 4.47.0+ is required by docling for rt_detr_v2 PDF layout parsing
-transformers==4.47.1     
+# 4.49.0+ is required by docling for rt_detr_v2 PDF layout parsing
+transformers==4.49.0
 sentence-transformers==3.4.1    # Updated to match transformers 4.47.1
 
 # ==========================================
